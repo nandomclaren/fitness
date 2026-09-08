@@ -11,8 +11,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons/*.png'],
+      // Caminhos relativos (sem "/" inicial): funcionam tanto na raiz de um domínio
+      // próprio quanto em um subcaminho (ex.: GitHub Pages em /fitness/).
       manifest: {
-        id: '/',
+        id: '.',
         lang: 'pt-BR',
         name: 'Sobrecarga - Treino de Musculação',
         short_name: 'Sobrecarga',
@@ -22,13 +24,13 @@ export default defineConfig({
         background_color: '#0b0c10',
         display: 'standalone',
         orientation: 'any',
-        start_url: '/',
-        scope: '/',
+        start_url: '.',
+        scope: '.',
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
           {
-            src: '/icons/icon-512-maskable.png',
+            src: 'icons/icon-512-maskable.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',

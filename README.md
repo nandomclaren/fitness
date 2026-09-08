@@ -52,16 +52,40 @@ fotos estáticas do free-exercise-db), é necessário uma chave gratuita da Rapi
 2. Acesse a página da [ExerciseDB API](https://rapidapi.com/exercisedb/api/exercisedb) e
    clique em **"Subscribe to Test"**, escolhendo o plano **Basic (gratuito)**.
 3. Na aba **Endpoints**, copie sua `X-RapidAPI-Key` (painel de "Code Snippets").
-4. Rode o script apontando para essa fonte:
+4. **Onde colocar a chave** — rode o script localmente (no seu computador, com o
+   repositório clonado), passando a chave de uma das formas abaixo:
 
-```bash
-RAPIDAPI_KEY=sua_chave_aqui npm run fetch-exercises -- --source=exercisedb
-```
+   **Opção A — direto no comando (mais simples), macOS/Linux:**
+
+   ```bash
+   RAPIDAPI_KEY=sua_chave_aqui npm run fetch-exercises -- --source=exercisedb
+   ```
+
+   No Windows (PowerShell):
+
+   ```powershell
+   $env:RAPIDAPI_KEY="sua_chave_aqui"; npm run fetch-exercises -- --source=exercisedb
+   ```
+
+   **Opção B — arquivo `.env` (fica salva para não digitar de novo):**
+
+   ```bash
+   cp .env.example .env
+   # edite o .env e cole: RAPIDAPI_KEY=sua_chave_aqui
+   ```
+
+   O `.env` já está no `.gitignore` (nunca vai pro Git), mas os scripts do `npm` não o
+   carregam sozinhos — exporte a variável antes de rodar:
+
+   ```bash
+   export $(cat .env | xargs) && npm run fetch-exercises -- --source=exercisedb
+   ```
 
 O script pagina automaticamente por toda a base, normaliza os nomes de músculos para a
-taxonomia interna (`src/types/muscle.ts`) e sobrescreve `src/data/exercises.json`. **Não
-compartilhe sua chave em repositórios públicos** — rode o comando localmente ou configure
-a variável de ambiente em um `.env` (já ignorado pelo `.gitignore`).
+taxonomia interna (`src/types/muscle.ts`) e sobrescreve `src/data/exercises.json`. Depois
+é só commitar o `src/data/exercises.json` atualizado. **Nunca cole sua chave direto no
+código, em commits ou em conversas/chats** — ela só deve existir no `.env` local ou na
+variável de ambiente do terminal.
 
 ### Schema de cada exercício
 
@@ -124,6 +148,50 @@ como nativo, o caminho recomendado é empacotar como **TWA (Trusted Web Activity
 
 Isso está fora do escopo deste repositório (requer domínio próprio e conta de
 desenvolvedor Google Play), mas o app já está pronto tecnicamente para esse empacotamento.
+
+## Usando o app no Android
+
+O app precisa estar publicado em uma URL HTTPS para ser instalado como PWA no Android
+(não dá pra "instalar" direto de um `npm run dev` local, exceto para teste rápido — veja
+a opção 1 abaixo).
+
+### Opção 1 — Teste rápido na mesma rede Wi-Fi (sem publicar nada)
+
+No computador onde o projeto está:
+
+```bash
+npm run build
+npm run preview -- --host
+```
+
+O terminal mostra um endereço tipo `http://192.168.x.x:4173`. Abra esse endereço no
+Chrome do celular (precisa estar na **mesma rede Wi-Fi**). Funciona para testar, mas some
+quando o comando é encerrado e não é instalável fora da rede local.
+
+### Opção 2 — Publicar de verdade no GitHub Pages (recomendado)
+
+Este repositório já inclui um workflow (`.github/workflows/deploy-pages.yml`) que builda e
+publica o app automaticamente a cada push na branch `main`. Para ativar (só precisa fazer
+uma vez):
+
+1. No GitHub, vá em **Settings → Pages** do repositório.
+2. Em **"Build and deployment" → Source**, selecione **"GitHub Actions"**.
+3. Dê um push/merge na branch `main` — o workflow builda e publica sozinho. Acompanhe em
+   **Actions**.
+4. Em poucos minutos o app estará em `https://nandomclaren.github.io/fitness/`.
+
+### Instalar como app no Android
+
+Com a URL publicada (do passo acima):
+
+1. Abra a URL no **Chrome** do Android.
+2. Toque no menu **⋮** (três pontinhos) → **"Instalar app"** (ou "Adicionar à tela
+   inicial").
+3. Confirme — o ícone do app aparece na tela inicial e abre em tela cheia, sem a barra do
+   navegador, como um app nativo. Funciona offline depois da primeira abertura.
+
+Esse é o mesmo app instalável (PWA) mencionado na seção anterior — o caminho para a Google
+Play Store (empacotar como TWA) é um passo opcional além deste.
 
 ## Estrutura do projeto
 
