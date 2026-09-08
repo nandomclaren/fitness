@@ -1,4 +1,4 @@
-import type { MuscleId } from './muscle'
+import type { MuscleId } from './muscle.ts'
 
 export type BodyRegion = 'upper body' | 'lower body' | 'core'
 

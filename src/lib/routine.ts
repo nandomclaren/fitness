@@ -1,7 +1,7 @@
-import { exercises } from './exercises'
-import type { Exercise } from '../types/exercise'
-import type { MuscleId } from '../types/muscle'
-import type { WorkoutSplit } from '../types/workout'
+import { exercises } from './exercises.ts'
+import type { Exercise } from '../types/exercise.ts'
+import type { MuscleId } from '../types/muscle.ts'
+import type { WorkoutSplit } from '../types/workout.ts'
 
 // Ordem de equipamentos preferida para exercícios-âncora (multiarticulares antes de isolados).
 const EQUIPMENT_PRIORITY = ['barbell', 'dumbbell', 'machine', 'cable', 'body only', 'other']

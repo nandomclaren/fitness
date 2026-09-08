@@ -1,5 +1,5 @@
-import rawExercises from '../data/exercises.json'
-import type { Exercise } from '../types/exercise'
+import rawExercises from '../data/exercises.json' with { type: 'json' }
+import type { Exercise } from '../types/exercise.ts'
 
 export const exercises: Exercise[] = rawExercises as Exercise[]
 

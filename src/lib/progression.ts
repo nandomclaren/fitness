@@ -1,24 +1,9 @@
-import { db } from './db'
-import type { LastPerformance, ProgressionSuggestion } from '../types/workout'
+import { api } from './api.ts'
+import type { LastPerformance, ProgressionSuggestion } from '../types/workout.ts'
 
 /** Busca o "top set" (maior peso, depois mais reps) da sessão mais recente que incluiu o exercício. */
 export async function getLastPerformance(exerciseId: string): Promise<LastPerformance | null> {
-  const sets = await db.sets.where('exerciseId').equals(exerciseId).sortBy('completedAt')
-  if (sets.length === 0) return null
-
-  const lastSessionId = sets[sets.length - 1].sessionId
-  const lastSessionSets = sets.filter((s) => s.sessionId === lastSessionId)
-
-  const topSet = lastSessionSets.reduce((best, s) =>
-    s.weightKg > best.weightKg || (s.weightKg === best.weightKg && s.reps > best.reps) ? s : best,
-  )
-
-  return {
-    weightKg: topSet.weightKg,
-    reps: topSet.reps,
-    rpe: topSet.rpe,
-    completedAt: topSet.completedAt,
-  }
+  return api.get<LastPerformance | null>(`/exercises/${exerciseId}/last-performance`)
 }
 
 function roundToHalfKg(value: number): number {

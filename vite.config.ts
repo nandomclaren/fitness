@@ -5,6 +5,13 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    // Em dev, o frontend (vite) e o backend (express) rodam em processos separados;
+    // isso encaminha /api pro servidor Express (npm run server:dev) na porta 3001.
+    proxy: {
+      '/api': 'http://localhost:3001',
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
