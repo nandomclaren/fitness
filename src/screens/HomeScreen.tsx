@@ -13,7 +13,7 @@ import type { Exercise } from '../types/exercise'
 import type { WorkoutSplit } from '../types/workout'
 import ExercisePicker from '../components/ExercisePicker'
 
-const SPLITS: WorkoutSplit[] = ['upper', 'lower', 'full']
+const SPLITS: WorkoutSplit[] = ['upper', 'lower', 'full', 'core']
 
 interface AiRoutineResponse {
   exerciseIds: string[]
@@ -42,7 +42,7 @@ export default function HomeScreen() {
 
   function selectSplit(s: WorkoutSplit) {
     setSplit(s)
-    setRoutine(buildSuggestedRoutine(s))
+    setRoutine(buildSuggestedRoutine(s, goals?.equipment))
     setAiRationale(null)
   }
 
@@ -106,7 +106,7 @@ export default function HomeScreen() {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-(--color-text-muted)">
           Qual treino de hoje?
         </h2>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {SPLITS.map((s) => (
             <button
               key={s}

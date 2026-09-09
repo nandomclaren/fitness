@@ -1,4 +1,4 @@
-export type WorkoutSplit = 'upper' | 'lower' | 'full'
+export type WorkoutSplit = 'upper' | 'lower' | 'full' | 'core'
 
 export interface SetEntry {
   id: string

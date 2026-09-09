@@ -2,18 +2,13 @@ import { Router } from 'express'
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '../prisma.ts'
 import { compactCatalog, exercises } from '../exercises.ts'
-import { buildSuggestedRoutine } from '../../src/lib/routine.ts'
+import { buildSuggestedRoutine, SPLIT_MUSCLES } from '../../src/lib/routine.ts'
+import { normalizeEquipment } from '../../src/lib/equipment.ts'
 import type { WorkoutSplit } from '../../src/types/workout.ts'
 
 export const routineRouter = Router()
 
 const client = new Anthropic()
-
-const SPLIT_REGIONS: Record<WorkoutSplit, string[]> = {
-  upper: ['upper body', 'core'],
-  lower: ['lower body', 'core'],
-  full: ['upper body', 'lower body', 'core'],
-}
 
 const PROPOSE_ROUTINE_TOOL: Anthropic.Tool = {
   name: 'propose_routine',
@@ -41,13 +36,16 @@ const PROPOSE_ROUTINE_TOOL: Anthropic.Tool = {
 
 routineRouter.post('/routine/suggested', async (req, res) => {
   const { split } = req.body as { split: WorkoutSplit }
-  if (!split || !SPLIT_REGIONS[split]) {
+  if (!split || !SPLIT_MUSCLES[split]) {
     res.status(400).json({ error: 'split inválido' })
     return
   }
 
+  // Declarado fora do try/catch: o fallback de erro (catch, abaixo) também precisa
+  // filtrar pelo equipamento disponível do usuário, não só a chamada feliz da IA.
+  let goals: Awaited<ReturnType<typeof prisma.userGoals.findUnique>> = null
   try {
-    const goals = await prisma.userGoals.findUnique({ where: { id: 'me' } })
+    goals = await prisma.userGoals.findUnique({ where: { id: 'me' } })
     const recentSessions = await prisma.workoutSession.findMany({
       where: { finishedAt: { not: null } },
       orderBy: { startedAt: 'desc' },
@@ -55,8 +53,14 @@ routineRouter.post('/routine/suggested', async (req, res) => {
       include: { sets: true },
     })
 
-    const regions = SPLIT_REGIONS[split]
-    const catalog = compactCatalog().filter((e) => regions.includes(e.bodyPart))
+    const targetMuscles = SPLIT_MUSCLES[split]
+    let catalog = compactCatalog().filter((e) => targetMuscles.includes(e.target))
+    if (goals?.equipment.length) {
+      const allowedEquipment = new Set(goals.equipment)
+      const filtered = catalog.filter((e) => allowedEquipment.has(normalizeEquipment(e.equipment)))
+      // Só aplica o filtro se sobrar catálogo suficiente pra IA escolher de verdade.
+      if (filtered.length >= 10) catalog = filtered
+    }
 
     const history = recentSessions.map((s) => ({
       split: s.split,
@@ -108,7 +112,7 @@ routineRouter.post('/routine/suggested', async (req, res) => {
     const filteredIds = input.exerciseIds.filter((id) => validIds.has(id))
 
     if (filteredIds.length < 3) {
-      const fallback = buildSuggestedRoutine(split)
+      const fallback = buildSuggestedRoutine(split, goals?.equipment)
       res.json({
         exerciseIds: fallback.map((e) => e.id),
         rationale:
@@ -120,7 +124,7 @@ routineRouter.post('/routine/suggested', async (req, res) => {
     res.json({ exerciseIds: filteredIds, rationale: input.rationale })
   } catch (err) {
     console.error('Erro ao gerar rotina sugerida por IA:', err)
-    const fallback = buildSuggestedRoutine(split)
+    const fallback = buildSuggestedRoutine(split, goals?.equipment)
     res.json({
       exerciseIds: fallback.map((e) => e.id),
       rationale: 'Não foi possível consultar a IA agora — usando a rotina balanceada padrão.',
