@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Dumbbell, GripVertical, Plus, Settings, Sparkles, X } from 'lucide-react'
+import { Dumbbell, GripVertical, History, Plus, Settings, Sparkles, X } from 'lucide-react'
 import { buildSuggestedRoutine, SPLIT_LABELS_PT } from '../lib/routine'
 import { useWorkout } from '../lib/workout-context'
 import { getGoals } from '../lib/goals.ts'
@@ -81,6 +81,13 @@ export default function HomeScreen() {
           <h1 className="text-xl font-bold leading-tight">Sobrecarga</h1>
           <p className="text-sm text-(--color-text-muted)">Seu personal trainer digital</p>
         </div>
+        <button
+          onClick={() => navigate('/historico')}
+          aria-label="Histórico de treinos"
+          className="rounded-full p-2 text-(--color-text-muted) hover:bg-(--color-surface-raised)"
+        >
+          <History size={20} />
+        </button>
         <button
           onClick={() => navigate('/objetivos')}
           aria-label="Revisar objetivos"

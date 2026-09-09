@@ -61,20 +61,27 @@ function makeCanvas(size) {
     size,
     rgba,
     set(x, y, [r, g, b, a]) {
-      if (x < 0 || y < 0 || x >= size || y >= size) return
-      const i = (y * size + x) * 4
+      // x/y quase sempre chegam fracionários (size * 0.12 etc.) — sem arredondar aqui,
+      // a escrita cai num índice não-inteiro do Buffer e nunca é aplicada de verdade
+      // (ela vira uma propriedade solta no objeto, não um byte real da imagem),
+      // deixando o PNG inteiro só com a cor de fundo.
+      const xi = Math.round(x)
+      const yi = Math.round(y)
+      if (xi < 0 || yi < 0 || xi >= size || yi >= size) return
+      const i = (yi * size + xi) * 4
       rgba[i] = r
       rgba[i + 1] = g
       rgba[i + 2] = b
       rgba[i + 3] = a
     },
     fillRect(x0, y0, x1, y1, color) {
-      for (let y = Math.max(0, y0); y < Math.min(size, y1); y++)
-        for (let x = Math.max(0, x0); x < Math.min(size, x1); x++) this.set(x, y, color)
+      for (let y = Math.max(0, Math.floor(y0)); y < Math.min(size, Math.ceil(y1)); y++)
+        for (let x = Math.max(0, Math.floor(x0)); x < Math.min(size, Math.ceil(x1)); x++)
+          this.set(x, y, color)
     },
     fillRoundRect(x0, y0, x1, y1, r, color) {
-      for (let y = Math.max(0, y0); y < Math.min(size, y1); y++) {
-        for (let x = Math.max(0, x0); x < Math.min(size, x1); x++) {
+      for (let y = Math.max(0, Math.floor(y0)); y < Math.min(size, Math.ceil(y1)); y++) {
+        for (let x = Math.max(0, Math.floor(x0)); x < Math.min(size, Math.ceil(x1)); x++) {
           const dx = x < x0 + r ? x0 + r - x : x > x1 - r ? x - (x1 - r) : 0
           const dy = y < y0 + r ? y0 + r - y : y > y1 - r ? y - (y1 - r) : 0
           if (dx * dx + dy * dy <= r * r || (dx === 0 && dy === 0) || (dx < r && dy === 0) || (dy < r && dx === 0)) {

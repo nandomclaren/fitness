@@ -16,6 +16,27 @@ sessionsRouter.post('/sessions', async (req, res) => {
   res.json(session)
 })
 
+sessionsRouter.get('/sessions', async (req, res) => {
+  const limit = Math.min(100, Number(req.query.limit) || 30)
+  const sessions = await prisma.workoutSession.findMany({
+    where: { finishedAt: { not: null } },
+    orderBy: { startedAt: 'desc' },
+    take: limit,
+    include: { sets: true },
+  })
+  res.json(
+    sessions.map((s) => ({
+      id: s.id,
+      split: s.split,
+      startedAt: s.startedAt,
+      finishedAt: s.finishedAt,
+      totalSets: s.sets.length,
+      totalExercises: new Set(s.sets.map((set) => set.exerciseId)).size,
+      totalVolumeKg: s.sets.reduce((sum, set) => sum + set.weightKg * set.reps, 0),
+    })),
+  )
+})
+
 sessionsRouter.post('/sessions/:id/finish', async (req, res) => {
   const session = await prisma.workoutSession.update({
     where: { id: req.params.id },

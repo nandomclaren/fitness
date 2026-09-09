@@ -45,3 +45,17 @@ export interface SessionSummary {
 export async function getSessionSummary(sessionId: string): Promise<SessionSummary> {
   return api.get<SessionSummary>(`/sessions/${sessionId}/summary`)
 }
+
+export interface SessionListItem {
+  id: string
+  split: WorkoutSplit
+  startedAt: string
+  finishedAt: string
+  totalSets: number
+  totalExercises: number
+  totalVolumeKg: number
+}
+
+export async function listSessions(): Promise<SessionListItem[]> {
+  return api.get<SessionListItem[]>('/sessions')
+}
