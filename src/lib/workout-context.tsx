@@ -1,17 +1,26 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import type { Exercise } from '../types/exercise'
 import type { WorkoutSession, WorkoutSplit } from '../types/workout'
+import type { RoutineItem } from './prescription.ts'
 import { startSession as startSessionInDb, finishSession as finishSessionInDb } from './session'
+
+interface PendingWorkout {
+  split: WorkoutSplit
+  routineItems: RoutineItem[]
+}
 
 interface WorkoutContextValue {
   session: WorkoutSession | null
-  exerciseList: Exercise[]
+  routineItems: RoutineItem[]
   currentIndex: number
-  currentExercise: Exercise | null
+  currentItem: RoutineItem | null
   isLastExercise: boolean
   isTvMode: boolean
+  pendingWorkout: PendingWorkout | null
   setTvMode: (on: boolean) => void
-  startWorkout: (split: WorkoutSplit, exercises: Exercise[]) => Promise<void>
+  /** Guarda a rotina escolhida sem iniciar a sessão ainda — usado pela tela de aquecimento. */
+  preparePendingWorkout: (split: WorkoutSplit, routineItems: RoutineItem[]) => void
+  /** Inicia de fato a sessão (grava no banco) a partir do que foi preparado. */
+  beginPreparedWorkout: () => Promise<void>
   goToNextExercise: () => void
   goToExercise: (index: number) => void
   finishWorkout: () => Promise<string | null>
@@ -21,26 +30,33 @@ const WorkoutContext = createContext<WorkoutContextValue | null>(null)
 
 export function WorkoutProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<WorkoutSession | null>(null)
-  const [exerciseList, setExerciseList] = useState<Exercise[]>([])
+  const [routineItems, setRoutineItems] = useState<RoutineItem[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isTvMode, setTvMode] = useState(false)
+  const [pendingWorkout, setPendingWorkout] = useState<PendingWorkout | null>(null)
 
-  const startWorkout = async (split: WorkoutSplit, exercises: Exercise[]) => {
+  const preparePendingWorkout = (split: WorkoutSplit, items: RoutineItem[]) => {
+    setPendingWorkout({ split, routineItems: items })
+  }
+
+  const beginPreparedWorkout = async () => {
+    if (!pendingWorkout) return
     const newSession = await startSessionInDb(
-      split,
-      exercises.map((e) => e.id),
+      pendingWorkout.split,
+      pendingWorkout.routineItems.map((item) => item.exercise.id),
     )
     setSession(newSession)
-    setExerciseList(exercises)
+    setRoutineItems(pendingWorkout.routineItems)
     setCurrentIndex(0)
+    setPendingWorkout(null)
   }
 
   const goToNextExercise = () => {
-    setCurrentIndex((i) => Math.min(i + 1, exerciseList.length - 1))
+    setCurrentIndex((i) => Math.min(i + 1, routineItems.length - 1))
   }
 
   const goToExercise = (index: number) => {
-    setCurrentIndex(Math.max(0, Math.min(index, exerciseList.length - 1)))
+    setCurrentIndex(Math.max(0, Math.min(index, routineItems.length - 1)))
   }
 
   const finishWorkout = async () => {
@@ -48,20 +64,22 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     await finishSessionInDb(session.id)
     const finishedId = session.id
     setSession(null)
-    setExerciseList([])
+    setRoutineItems([])
     setCurrentIndex(0)
     return finishedId
   }
 
   const value: WorkoutContextValue = {
     session,
-    exerciseList,
+    routineItems,
     currentIndex,
-    currentExercise: exerciseList[currentIndex] ?? null,
-    isLastExercise: currentIndex >= exerciseList.length - 1,
+    currentItem: routineItems[currentIndex] ?? null,
+    isLastExercise: currentIndex >= routineItems.length - 1,
     isTvMode,
+    pendingWorkout,
     setTvMode,
-    startWorkout,
+    preparePendingWorkout,
+    beginPreparedWorkout,
     goToNextExercise,
     goToExercise,
     finishWorkout,

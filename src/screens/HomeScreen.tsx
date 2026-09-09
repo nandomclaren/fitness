@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Dumbbell, GripVertical, History, Plus, Settings, Sparkles, X } from 'lucide-react'
+import { Clock, Dumbbell, GripVertical, History, Plus, Settings, Sparkles, X } from 'lucide-react'
 import { buildSuggestedRoutine, SPLIT_LABELS_PT } from '../lib/routine'
 import { useWorkout } from '../lib/workout-context'
 import { getGoals } from '../lib/goals.ts'
 import { api } from '../lib/api.ts'
 import { getExercise } from '../lib/exercises.ts'
+import { buildRoutineItems, estimateWorkoutMinutes } from '../lib/prescription.ts'
 import { MUSCLE_LABELS_PT } from '../types/muscle'
+import type { UserGoals } from '../types/goals.ts'
 import type { Exercise } from '../types/exercise'
 import type { WorkoutSplit } from '../types/workout'
 import ExercisePicker from '../components/ExercisePicker'
@@ -20,19 +22,23 @@ interface AiRoutineResponse {
 
 export default function HomeScreen() {
   const navigate = useNavigate()
-  const { startWorkout } = useWorkout()
+  const { preparePendingWorkout } = useWorkout()
+  const [goals, setGoals] = useState<UserGoals | null>(null)
   const [split, setSplit] = useState<WorkoutSplit | null>(null)
   const [routine, setRoutine] = useState<Exercise[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [starting, setStarting] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiRationale, setAiRationale] = useState<string | null>(null)
 
   useEffect(() => {
-    getGoals().then((goals) => {
-      if (!goals) navigate('/onboarding', { replace: true })
+    getGoals().then((g) => {
+      if (!g) navigate('/onboarding', { replace: true })
+      else setGoals(g)
     })
   }, [navigate])
+
+  const routineItems = useMemo(() => buildRoutineItems(routine, goals), [routine, goals])
+  const estimatedMinutes = useMemo(() => estimateWorkoutMinutes(routineItems), [routineItems])
 
   function selectSplit(s: WorkoutSplit) {
     setSplit(s)
@@ -64,11 +70,10 @@ export default function HomeScreen() {
     }
   }
 
-  async function handleStart() {
-    if (!split || routine.length === 0) return
-    setStarting(true)
-    await startWorkout(split, routine)
-    navigate('/treino')
+  function handleStart() {
+    if (!split || routineItems.length === 0) return
+    preparePendingWorkout(split, routineItems)
+    navigate('/aquecimento')
   }
 
   return (
@@ -138,7 +143,7 @@ export default function HomeScreen() {
         <section className="mt-6">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-(--color-text-muted)">
-              Exercícios ({routine.length})
+              Exercícios ({routineItems.length})
             </h2>
             <button
               onClick={() => setPickerOpen(true)}
@@ -149,7 +154,7 @@ export default function HomeScreen() {
           </div>
 
           <ul className="flex flex-col gap-2">
-            {routine.map((exercise) => (
+            {routineItems.map(({ exercise, prescription }) => (
               <li
                 key={exercise.id}
                 className="flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-3"
@@ -164,7 +169,9 @@ export default function HomeScreen() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{exercise.name}</p>
                   <p className="text-xs text-(--color-text-muted)">
-                    {MUSCLE_LABELS_PT[exercise.target]}
+                    {MUSCLE_LABELS_PT[exercise.target]} · {prescription.sets}x
+                    {prescription.repRangeMin}-{prescription.repRangeMax} · desc.{' '}
+                    {prescription.restSeconds}s
                   </p>
                 </div>
                 <button
@@ -178,7 +185,7 @@ export default function HomeScreen() {
             ))}
           </ul>
 
-          {routine.length === 0 && (
+          {routineItems.length === 0 && (
             <p className="rounded-xl border border-dashed border-(--color-border) p-6 text-center text-sm text-(--color-text-muted)">
               Nenhum exercício na lista. Adicione ao menos um para começar.
             </p>
@@ -186,14 +193,16 @@ export default function HomeScreen() {
         </section>
       )}
 
-      {split && routine.length > 0 && (
+      {split && routineItems.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 mx-auto max-w-lg border-t border-(--color-border) bg-(--color-bg) p-4">
+          <p className="mb-2 flex items-center justify-center gap-1.5 text-xs text-(--color-text-muted)">
+            <Clock size={14} /> ~{estimatedMinutes} min estimados (aquecimento + treino + desaquecimento)
+          </p>
           <button
             onClick={handleStart}
-            disabled={starting}
-            className="w-full rounded-xl bg-(--color-primary) py-4 text-center text-lg font-bold text-white transition-opacity disabled:opacity-60"
+            className="w-full rounded-xl bg-(--color-primary) py-4 text-center text-lg font-bold text-white transition-opacity"
           >
-            {starting ? 'Iniciando...' : 'Iniciar Treino'}
+            Iniciar Treino
           </button>
         </div>
       )}

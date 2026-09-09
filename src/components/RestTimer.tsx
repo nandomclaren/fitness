@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw } from 'lucide-react'
+import { useCountdown } from '../hooks/useCountdown.ts'
 
 interface RestTimerProps {
   seconds: number
@@ -7,27 +7,7 @@ interface RestTimerProps {
 }
 
 export default function RestTimer({ seconds, onFinish }: RestTimerProps) {
-  const [remaining, setRemaining] = useState(seconds)
-  const [running, setRunning] = useState(true)
-  const onFinishRef = useRef(onFinish)
-  useEffect(() => {
-    onFinishRef.current = onFinish
-  }, [onFinish])
-
-  useEffect(() => {
-    setRemaining(seconds)
-    setRunning(true)
-  }, [seconds])
-
-  useEffect(() => {
-    if (!running || remaining <= 0) return
-    const t = setTimeout(() => setRemaining((r) => r - 1), 1000)
-    return () => clearTimeout(t)
-  }, [running, remaining])
-
-  useEffect(() => {
-    if (remaining === 0) onFinishRef.current?.()
-  }, [remaining])
+  const { remaining, running, toggle, reset } = useCountdown(seconds, onFinish)
 
   const mm = String(Math.floor(Math.max(0, remaining) / 60)).padStart(2, '0')
   const ss = String(Math.max(0, remaining) % 60).padStart(2, '0')
@@ -59,14 +39,14 @@ export default function RestTimer({ seconds, onFinish }: RestTimerProps) {
       </p>
       <div className="flex gap-2">
         <button
-          onClick={() => setRunning((r) => !r)}
+          onClick={toggle}
           aria-label={running ? 'Pausar' : 'Continuar'}
           className="rounded-full bg-(--color-surface-raised) p-2.5 text-(--color-text)"
         >
           {running ? <Pause size={18} /> : <Play size={18} />}
         </button>
         <button
-          onClick={() => setRemaining(seconds)}
+          onClick={reset}
           aria-label="Reiniciar"
           className="rounded-full bg-(--color-surface-raised) p-2.5 text-(--color-text)"
         >

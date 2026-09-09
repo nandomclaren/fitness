@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cast, ChevronRight, Maximize2, Minimize2, TrendingDown, TrendingUp, Trophy, X } from 'lucide-react'
+import {
+  Cast,
+  CheckCircle2,
+  ChevronRight,
+  Maximize2,
+  Minimize2,
+  TrendingDown,
+  TrendingUp,
+  Trophy,
+  X,
+} from 'lucide-react'
 import { useWorkout } from '../lib/workout-context'
 import { getLastPerformance, suggestNextLoad } from '../lib/progression'
 import { logSet } from '../lib/session'
@@ -10,14 +20,12 @@ import CastModal from '../components/CastModal'
 import type { LastPerformance, ProgressionSuggestion, SetEntry } from '../types/workout'
 import { MUSCLE_LABELS_PT } from '../types/muscle'
 
-const REST_SECONDS = 90
-
 export default function PlayerScreen() {
   const navigate = useNavigate()
   const {
     session,
-    exerciseList,
-    currentExercise,
+    routineItems,
+    currentItem,
     currentIndex,
     isLastExercise,
     isTvMode,
@@ -25,6 +33,9 @@ export default function PlayerScreen() {
     goToNextExercise,
     finishWorkout,
   } = useWorkout()
+
+  const currentExercise = currentItem?.exercise ?? null
+  const prescription = currentItem?.prescription ?? null
 
   const [last, setLast] = useState<LastPerformance | null>(null)
   const [suggestion, setSuggestion] = useState<ProgressionSuggestion | null>(null)
@@ -40,14 +51,14 @@ export default function PlayerScreen() {
   // Só valida ao montar: se o usuário cair em /treino sem sessão ativa (ex.: refresh),
   // volta para a Home. Não pode reagir a mudanças posteriores de `session`, senão o
   // finishWorkout() (que zera a sessão do contexto) dispara essa mesma checagem e o
-  // `replace` sobrescreve a navegação para /resumo/:id que acabou de acontecer.
+  // `replace` sobrescreve a navegação para /desaquecimento que acabou de acontecer.
   useEffect(() => {
     if (!session) navigate('/', { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
-    if (!currentExercise) return
+    if (!currentExercise || !prescription) return
     let cancelled = false
     setLoadingHistory(true)
     setLoggedSets([])
@@ -63,7 +74,8 @@ export default function PlayerScreen() {
       } else {
         setSuggestion(null)
         setWeight(0)
-        setReps(10)
+        // Sem histórico: usa o meio da faixa de reps prescrita como ponto de partida.
+        setReps(Math.round((prescription.repRangeMin + prescription.repRangeMax) / 2))
       }
       setRpe(8)
       setLoadingHistory(false)
@@ -71,9 +83,10 @@ export default function PlayerScreen() {
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentExercise])
 
-  if (!currentExercise || !session) return null
+  if (!currentExercise || !prescription || !session) return null
 
   async function handleLogSet() {
     if (!currentExercise) return
@@ -93,11 +106,13 @@ export default function PlayerScreen() {
   async function handleAdvance() {
     if (isLastExercise) {
       const sessionId = await finishWorkout()
-      if (sessionId) navigate(`/resumo/${sessionId}`)
+      if (sessionId) navigate(`/desaquecimento/${sessionId}`)
     } else {
       goToNextExercise()
     }
   }
+
+  const goalMet = loggedSets.length >= prescription.sets
 
   return (
     <div
@@ -112,7 +127,7 @@ export default function PlayerScreen() {
           <X size={20} />
         </button>
         <p className="text-sm font-semibold text-(--color-text-muted)">
-          Exercício {currentIndex + 1} de {exerciseList.length}
+          Exercício {currentIndex + 1} de {routineItems.length}
         </p>
         <div className="flex items-center gap-1">
           <button
@@ -150,7 +165,17 @@ export default function PlayerScreen() {
           ))}
         </div>
 
-        <section className="mt-5 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
+        <p className="mt-3 flex items-center gap-2 text-sm font-medium text-(--color-text-muted)">
+          Meta: {prescription.sets}x{prescription.repRangeMin}-{prescription.repRangeMax} ·
+          descanso {prescription.restSeconds}s
+          {goalMet && (
+            <span className="flex items-center gap-1 text-(--color-success)">
+              <CheckCircle2 size={16} /> meta batida
+            </span>
+          )}
+        </p>
+
+        <section className="mt-4 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
           {loadingHistory ? (
             <p className="text-sm text-(--color-text-muted)">Carregando histórico...</p>
           ) : last ? (
@@ -184,7 +209,9 @@ export default function PlayerScreen() {
                 key={s.id}
                 className="flex items-center justify-between rounded-lg bg-(--color-surface-raised) px-3 py-2 text-sm"
               >
-                <span>Série {s.setNumber}</span>
+                <span>
+                  Série {s.setNumber} de {prescription.sets}
+                </span>
                 <span className="font-medium">
                   {s.weightKg}kg × {s.reps} reps (RPE {s.rpe})
                 </span>
@@ -200,7 +227,7 @@ export default function PlayerScreen() {
                 <Trophy size={18} /> Novo recorde pessoal!
               </p>
             )}
-            <RestTimer seconds={REST_SECONDS} />
+            <RestTimer seconds={prescription.restSeconds} />
           </div>
         )}
 
@@ -249,7 +276,7 @@ export default function PlayerScreen() {
             onClick={handleLogSet}
             className="flex-1 rounded-xl bg-(--color-primary) py-4 text-center text-lg font-bold text-white"
           >
-            Registrar série
+            Registrar série ({loggedSets.length + 1} de {prescription.sets})
           </button>
         ) : (
           <button

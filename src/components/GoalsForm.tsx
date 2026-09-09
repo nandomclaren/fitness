@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { Info } from 'lucide-react'
 import {
   EQUIPMENT_OPTIONS,
   LEVEL_LABELS,
+  OBJECTIVE_DESCRIPTIONS,
   OBJECTIVE_LABELS,
   type ExperienceLevel,
   type Objective,
@@ -27,6 +29,7 @@ export default function GoalsForm({ initial, submitLabel, onSaved }: GoalsFormPr
   )
   const [limitations, setLimitations] = useState(initial?.limitations ?? '')
   const [saving, setSaving] = useState(false)
+  const [infoOpen, setInfoOpen] = useState<Objective | null>(null)
 
   function toggleEquipment(id: string) {
     setEquipment((prev) => {
@@ -57,20 +60,39 @@ export default function GoalsForm({ initial, submitLabel, onSaved }: GoalsFormPr
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-(--color-text-muted)">
           Qual seu objetivo principal?
         </h2>
-        <div className="grid grid-cols-1 gap-2">
+        <div className="flex flex-col gap-2">
           {OBJECTIVES.map((o) => (
-            <button
-              type="button"
-              key={o}
-              onClick={() => setObjective(o)}
-              className={`rounded-xl border px-4 py-3 text-left font-medium transition-colors ${
-                objective === o
-                  ? 'border-(--color-primary) bg-(--color-primary)/15 text-(--color-primary)'
-                  : 'border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-raised)'
-              }`}
-            >
-              {OBJECTIVE_LABELS[o]}
-            </button>
+            <div key={o}>
+              <div
+                className={`flex items-center gap-1 rounded-xl border pr-2 transition-colors ${
+                  objective === o
+                    ? 'border-(--color-primary) bg-(--color-primary)/15 text-(--color-primary)'
+                    : 'border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-raised)'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setObjective(o)}
+                  className="flex-1 px-4 py-3 text-left font-medium"
+                >
+                  {OBJECTIVE_LABELS[o]}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInfoOpen((cur) => (cur === o ? null : o))}
+                  aria-label={`O que é ${OBJECTIVE_LABELS[o]}?`}
+                  aria-expanded={infoOpen === o}
+                  className="shrink-0 rounded-full p-1.5 text-(--color-text-muted) hover:bg-(--color-surface-raised) hover:text-(--color-text)"
+                >
+                  <Info size={18} />
+                </button>
+              </div>
+              {infoOpen === o && (
+                <p className="mt-1.5 rounded-lg bg-(--color-surface-raised) p-3 text-sm text-(--color-text-muted)">
+                  {OBJECTIVE_DESCRIPTIONS[o]}
+                </p>
+              )}
+            </div>
           ))}
         </div>
       </section>
