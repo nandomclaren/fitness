@@ -5,6 +5,8 @@ export type BodyRegion = 'upper body' | 'lower body' | 'core'
 export interface Exercise {
   id: string
   name: string
+  /** Nome original em inglês (antes da tradução) — usado ao exportar/copiar o treino. */
+  nameEn: string
   bodyPart: BodyRegion
   target: MuscleId
   secondaryMuscles: MuscleId[]

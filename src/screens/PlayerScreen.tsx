@@ -114,6 +114,16 @@ export default function PlayerScreen() {
 
   const goalMet = loggedSets.length >= prescription.sets
 
+  // Depois do descanso: se a meta de séries do exercício ainda não foi batida, volta pro
+  // formulário pra registrar a próxima série (não avança pro próximo exercício sozinho).
+  async function handleContinueAfterRest() {
+    if (goalMet) {
+      await handleAdvance()
+    } else {
+      setShowRest(false)
+    }
+  }
+
   return (
     <div
       className={`mx-auto flex min-h-svh max-w-2xl flex-col ${isTvMode ? 'text-[1.25em]' : ''}`}
@@ -270,20 +280,35 @@ export default function PlayerScreen() {
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 mx-auto flex max-w-2xl gap-3 border-t border-(--color-border) bg-(--color-bg) p-4">
-        {!showRest ? (
-          <button
-            onClick={handleLogSet}
-            className="flex-1 rounded-xl bg-(--color-primary) py-4 text-center text-lg font-bold text-white"
-          >
-            Registrar série ({loggedSets.length + 1} de {prescription.sets})
-          </button>
-        ) : (
+      <div className="fixed inset-x-0 bottom-0 mx-auto flex max-w-2xl flex-col gap-2 border-t border-(--color-border) bg-(--color-bg) p-4">
+        <div className="flex gap-3">
+          {!showRest ? (
+            <button
+              onClick={handleLogSet}
+              className="flex-1 rounded-xl bg-(--color-primary) py-4 text-center text-lg font-bold text-white"
+            >
+              Registrar série ({loggedSets.length + 1} de {prescription.sets})
+            </button>
+          ) : (
+            <button
+              onClick={handleContinueAfterRest}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-(--color-success) py-4 text-center text-lg font-bold text-white"
+            >
+              {goalMet
+                ? isLastExercise
+                  ? 'Finalizar treino'
+                  : 'Próximo exercício'
+                : `Próxima série (${loggedSets.length + 1} de ${prescription.sets})`}{' '}
+              <ChevronRight size={20} />
+            </button>
+          )}
+        </div>
+        {showRest && !goalMet && (
           <button
             onClick={handleAdvance}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-(--color-success) py-4 text-center text-lg font-bold text-white"
+            className="text-center text-sm text-(--color-text-muted) underline"
           >
-            {isLastExercise ? 'Finalizar treino' : 'Próximo exercício'} <ChevronRight size={20} />
+            {isLastExercise ? 'Pular direto para o resumo' : 'Pular para o próximo exercício'}
           </button>
         )}
       </div>

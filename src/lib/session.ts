@@ -34,6 +34,7 @@ export async function finishSession(sessionId: string): Promise<void> {
 
 export interface SessionSummary {
   session: WorkoutSession
+  sets: SetEntry[]
   totalVolumeKg: number
   durationMinutes: number
   totalSets: number

@@ -16,7 +16,7 @@
  *   npm run fetch-exercises                      # fonte "free" (sem chave)
  *   RAPIDAPI_KEY=xxxx npm run fetch-exercises -- --source=exercisedb
  */
-import { writeFileSync, readFileSync, mkdirSync } from 'node:fs'
+import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs'
 import { ProxyAgent, setGlobalDispatcher } from 'undici'
 import { normalizeMuscleName, type MuscleId } from '../src/types/muscle'
 
@@ -122,6 +122,7 @@ async function fetchFreeExerciseDb(): Promise<Exercise[]> {
     out.push({
       id: slugId(item.id, `free-${out.length}`),
       name: translateName(item.name),
+      nameEn: item.name,
       bodyPart: REGION_BY_MUSCLE[target],
       target,
       secondaryMuscles,
@@ -258,20 +259,29 @@ async function fetchExerciseDbCuratedGifs(): Promise<Exercise[]> {
       ),
     )
 
-    const imageUrl = `https://exercisedb.p.rapidapi.com/image?resolution=${GIF_RESOLUTION}&exerciseId=${item.id}`
-    const res = await fetch(imageUrl, { headers })
-    if (!res.ok) {
-      console.log(`  -> [${i + 1}/${selected.length}] falha ao baixar GIF de ${item.id}: HTTP ${res.status}`)
+    const gifPath = `public/exercises/gifs/${item.id}.gif`
+    if (existsSync(gifPath)) {
+      // Já baixado numa execução anterior — reaproveita o arquivo e não gasta cota de novo.
+      console.log(`  -> [${i + 1}/${selected.length}] ${item.id} ${item.name} (já baixado, reaproveitando)`)
+    } else {
+      const imageUrl = `https://exercisedb.p.rapidapi.com/image?resolution=${GIF_RESOLUTION}&exerciseId=${item.id}`
+      const res = await fetch(imageUrl, { headers })
+      if (!res.ok) {
+        console.log(`  -> [${i + 1}/${selected.length}] falha ao baixar GIF de ${item.id}: HTTP ${res.status}`)
+        await new Promise((r) => setTimeout(r, 300))
+        continue
+      }
+      const gifBuffer = Buffer.from(await res.arrayBuffer())
+      writeFileSync(gifPath, gifBuffer)
+      console.log(`  -> [${i + 1}/${selected.length}] ${item.id} ${item.name}`)
+      // Pausa curta entre downloads para não estourar o limite de taxa por segundo.
       await new Promise((r) => setTimeout(r, 300))
-      continue
     }
-    const gifBuffer = Buffer.from(await res.arrayBuffer())
-    writeFileSync(`public/exercises/gifs/${item.id}.gif`, gifBuffer)
-    console.log(`  -> [${i + 1}/${selected.length}] ${item.id} ${item.name}`)
 
     out.push({
       id: `edb-${item.id}`,
       name: translateName(item.name),
+      nameEn: toTitleCase(item.name),
       bodyPart: REGION_BY_MUSCLE[target],
       target,
       secondaryMuscles,
@@ -279,9 +289,6 @@ async function fetchExerciseDbCuratedGifs(): Promise<Exercise[]> {
       gifUrl: `/exercises/gifs/${item.id}.gif`,
       instructions: item.instructions,
     })
-
-    // Pausa curta entre downloads para não estourar o limite de taxa por segundo.
-    await new Promise((r) => setTimeout(r, 300))
   }
 
   return out

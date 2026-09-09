@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Clock, Dumbbell, ListChecks, Trophy } from 'lucide-react'
+import { Check, Clock, Copy, Dumbbell, ListChecks, Trophy } from 'lucide-react'
 import { getSessionSummary, type SessionSummary } from '../lib/session'
 import { getExercise } from '../lib/exercises'
+import { buildWorkoutCopyText } from '../lib/copyWorkout.ts'
 import MuscleMap, { type MuscleHeat } from '../components/MuscleMap'
 import type { MuscleId } from '../types/muscle'
 
@@ -28,11 +29,20 @@ export default function SummaryScreen() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
   const [summary, setSummary] = useState<SessionSummary | null>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!sessionId) return
     getSessionSummary(sessionId).then(setSummary)
   }, [sessionId])
+
+  async function handleCopy() {
+    if (!summary) return
+    const text = buildWorkoutCopyText(summary.sets)
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const { heat, intensity } = useMemo(() => {
     if (!summary) return { heat: {}, intensity: {} }
@@ -92,6 +102,25 @@ export default function SummaryScreen() {
           value={`${summary.prsBroken.length}`}
         />
       </section>
+
+      <button
+        onClick={handleCopy}
+        className={`mt-3 flex w-full items-center justify-center gap-2 rounded-xl border py-3 text-sm font-semibold transition-colors ${
+          copied
+            ? 'border-(--color-success) bg-(--color-success)/15 text-(--color-success)'
+            : 'border-(--color-border) bg-(--color-surface) text-(--color-text) hover:bg-(--color-surface-raised)'
+        }`}
+      >
+        {copied ? (
+          <>
+            <Check size={16} /> Copiado!
+          </>
+        ) : (
+          <>
+            <Copy size={16} /> Copiar treino
+          </>
+        )}
+      </button>
 
       {summary.prsBroken.length > 0 && (
         <section className="mt-5 rounded-xl border border-(--color-secondary)/40 bg-(--color-secondary)/10 p-4">

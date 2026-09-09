@@ -117,7 +117,10 @@ sessionsRouter.get('/sessions/:id/summary', async (req, res) => {
     res.status(404).json({ error: 'sessão não encontrada' })
     return
   }
-  const sets = await prisma.setEntry.findMany({ where: { sessionId } })
+  const sets = await prisma.setEntry.findMany({
+    where: { sessionId },
+    orderBy: [{ completedAt: 'asc' }, { setNumber: 'asc' }],
+  })
 
   const totalVolumeKg = sets.reduce((sum, s) => sum + s.weightKg * s.reps, 0)
   const startedAt = session.startedAt.getTime()
@@ -160,6 +163,7 @@ sessionsRouter.get('/sessions/:id/summary', async (req, res) => {
 
   res.json({
     session,
+    sets,
     totalVolumeKg,
     durationMinutes,
     totalSets: sets.length,
