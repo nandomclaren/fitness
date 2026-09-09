@@ -70,7 +70,14 @@ export default function PlayerScreen() {
         const sug = suggestNextLoad(lp)
         setSuggestion(sug)
         setWeight(sug.weightKg)
-        setReps(sug.reps)
+        // Encaixa a sugestão (baseada no histórico) dentro da faixa de reps prescrita
+        // atual — se o objetivo mudou desde a última vez, o histórico pode sugerir um
+        // número de reps fora da meta de hoje.
+        const clampedReps = Math.min(
+          prescription.repRangeMax,
+          Math.max(prescription.repRangeMin, sug.reps),
+        )
+        setReps(clampedReps)
       } else {
         setSuggestion(null)
         setWeight(0)
