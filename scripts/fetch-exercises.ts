@@ -16,8 +16,16 @@
  *   npm run fetch-exercises                      # fonte "free" (sem chave)
  *   RAPIDAPI_KEY=xxxx npm run fetch-exercises -- --source=exercisedb
  */
-import { writeFileSync } from 'node:fs'
+import { writeFileSync, readFileSync, mkdirSync } from 'node:fs'
+import { ProxyAgent, setGlobalDispatcher } from 'undici'
 import { normalizeMuscleName, type MuscleId } from '../src/types/muscle'
+
+// Respeita HTTPS_PROXY/HTTP_PROXY se definida (ex.: redes corporativas, sandboxes) — o
+// fetch nativo do Node, ao contrário de curl/git/npm, não lê essa variável sozinho.
+const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY
+if (proxyUrl) {
+  setGlobalDispatcher(new ProxyAgent(proxyUrl))
+}
 import type { BodyRegion, Exercise } from '../src/types/exercise'
 import { NAME_TRANSLATIONS_PT } from './translations-pt'
 
@@ -133,11 +141,74 @@ interface ExerciseDbItem {
   target: string
   secondaryMuscles: string[]
   equipment: string
-  gifUrl: string
   instructions?: string[]
+  // A listagem da API atual NÃO inclui gifUrl — o GIF só vem de um endpoint à parte
+  // (ver fetchExerciseDbCuratedGifs), que gasta 1 requisição de cota por exercício.
 }
 
-async function fetchExerciseDb(): Promise<Exercise[]> {
+async function fetchAllExerciseDbItems(headers: Record<string, string>): Promise<ExerciseDbItem[]> {
+  // O plano gratuito da RapidAPI para a ExerciseDB ignora um `limit` maior e sempre
+  // devolve no máximo 10 itens por página — por isso paginamos até vir uma página vazia,
+  // avançando o offset pelo tamanho real recebido (nunca pelo limit pedido).
+  const limit = 100
+  let offset = 0
+  const all: ExerciseDbItem[] = []
+  console.log('Baixando lista de exercícios da ExerciseDB via RapidAPI...')
+  for (;;) {
+    const url = `https://exercisedb.p.rapidapi.com/exercises?limit=${limit}&offset=${offset}`
+    const res = await fetch(url, { headers })
+    if (!res.ok) throw new Error(`ExerciseDB HTTP ${res.status}: ${await res.text()}`)
+    const page: ExerciseDbItem[] = await res.json()
+    if (page.length === 0) break
+    all.push(...page)
+    console.log(`  -> offset ${offset}: +${page.length} (total ${all.length})`)
+    offset += page.length
+    // Pausa curta entre requisições para não estourar o limite de taxa por segundo do plano gratuito.
+    await new Promise((r) => setTimeout(r, 250))
+  }
+  return all
+}
+
+// Ordem de prioridade de equipamento nos valores usados pela ExerciseDB (diferem dos
+// valores do free-exercise-db). Usada só para escolher QUAIS exercícios merecem gastar
+// cota baixando o GIF real — não afeta o restante do catálogo.
+const EXERCISEDB_EQUIPMENT_PRIORITY = [
+  'barbell',
+  'ez barbell',
+  'olympic barbell',
+  'trap bar',
+  'dumbbell',
+  'smith machine',
+  'leverage machine',
+  'sled machine',
+  'cable',
+  'kettlebell',
+  'body weight',
+]
+
+function equipmentRank(equipment: string): number {
+  const idx = EXERCISEDB_EQUIPMENT_PRIORITY.indexOf(equipment.toLowerCase())
+  return idx === -1 ? 99 : idx
+}
+
+// Máximo de exercícios por músculo para os quais baixamos o GIF real (cada download
+// gasta 1 requisição da cota mensal gratuita da RapidAPI — ver README).
+const MAX_GIFS_PER_MUSCLE = 15
+const GIF_RESOLUTION = 180
+
+/**
+ * Baixa a lista completa de metadados da ExerciseDB (barata: ~140 requisições no total,
+ * já que cada página custa 1 requisição independente do tamanho) e, a partir dela,
+ * seleciona um subconjunto prioritário (os exercícios mais "âncora" por músculo,
+ * priorizando barra/halteres/máquina) para baixar o GIF animado de verdade — o único
+ * jeito de exibir a mídia real no navegador, já que o endpoint de imagem exige um header
+ * de autenticação que uma tag <img> não consegue enviar, então a imagem precisa ser
+ * baixada aqui (com a chave) e re-hospedada em public/exercises/gifs/.
+ *
+ * Esse subconjunto é ADICIONADO ao catálogo existente (não substitui o free-exercise-db),
+ * já que baixar o GIF de todos os ~1357 exercícios estouraria a cota gratuita mensal.
+ */
+async function fetchExerciseDbCuratedGifs(): Promise<Exercise[]> {
   const apiKey = process.env.RAPIDAPI_KEY
   if (!apiKey) {
     throw new Error(
@@ -151,24 +222,32 @@ async function fetchExerciseDb(): Promise<Exercise[]> {
     'X-RapidAPI-Host': 'exercisedb.p.rapidapi.com',
   }
 
-  const limit = 100
-  let offset = 0
-  const all: ExerciseDbItem[] = []
-  console.log('Baixando ExerciseDB via RapidAPI...')
-  for (;;) {
-    const url = `https://exercisedb.p.rapidapi.com/exercises?limit=${limit}&offset=${offset}`
-    const res = await fetch(url, { headers })
-    if (!res.ok) throw new Error(`ExerciseDB HTTP ${res.status}: ${await res.text()}`)
-    const page: ExerciseDbItem[] = await res.json()
-    if (page.length === 0) break
-    all.push(...page)
-    console.log(`  -> offset ${offset}: +${page.length} (total ${all.length})`)
-    offset += limit
-    if (page.length < limit) break
+  const all = await fetchAllExerciseDbItems(headers)
+
+  const byMuscle = new Map<MuscleId, ExerciseDbItem[]>()
+  for (const item of all) {
+    const target = normalizeMuscleName(item.target)
+    if (!target) continue
+    const list = byMuscle.get(target) ?? []
+    list.push(item)
+    byMuscle.set(target, list)
   }
 
+  const selected: ExerciseDbItem[] = []
+  for (const items of byMuscle.values()) {
+    items.sort((a, b) => equipmentRank(a.equipment) - equipmentRank(b.equipment))
+    selected.push(...items.slice(0, MAX_GIFS_PER_MUSCLE))
+  }
+
+  console.log(
+    `\nSelecionados ${selected.length} exercícios prioritários para baixar o GIF real ` +
+      `(até ${MAX_GIFS_PER_MUSCLE} por músculo) — isso gasta ${selected.length} requisições da cota.`,
+  )
+
+  mkdirSync('public/exercises/gifs', { recursive: true })
+
   const out: Exercise[] = []
-  for (const item of all) {
+  for (const [i, item] of selected.entries()) {
     const target = normalizeMuscleName(item.target)
     if (!target) continue
     const secondaryMuscles = Array.from(
@@ -178,17 +257,33 @@ async function fetchExerciseDb(): Promise<Exercise[]> {
           .filter((m): m is MuscleId => !!m && m !== target),
       ),
     )
+
+    const imageUrl = `https://exercisedb.p.rapidapi.com/image?resolution=${GIF_RESOLUTION}&exerciseId=${item.id}`
+    const res = await fetch(imageUrl, { headers })
+    if (!res.ok) {
+      console.log(`  -> [${i + 1}/${selected.length}] falha ao baixar GIF de ${item.id}: HTTP ${res.status}`)
+      await new Promise((r) => setTimeout(r, 300))
+      continue
+    }
+    const gifBuffer = Buffer.from(await res.arrayBuffer())
+    writeFileSync(`public/exercises/gifs/${item.id}.gif`, gifBuffer)
+    console.log(`  -> [${i + 1}/${selected.length}] ${item.id} ${item.name}`)
+
     out.push({
-      id: item.id,
+      id: `edb-${item.id}`,
       name: translateName(item.name),
       bodyPart: REGION_BY_MUSCLE[target],
       target,
       secondaryMuscles,
       equipment: item.equipment,
-      gifUrl: item.gifUrl,
+      gifUrl: `/exercises/gifs/${item.id}.gif`,
       instructions: item.instructions,
     })
+
+    // Pausa curta entre downloads para não estourar o limite de taxa por segundo.
+    await new Promise((r) => setTimeout(r, 300))
   }
+
   return out
 }
 
@@ -196,8 +291,19 @@ async function main() {
   const sourceArg = process.argv.find((a) => a.startsWith('--source='))
   const source = sourceArg ? sourceArg.split('=')[1] : 'free'
 
-  const exercises =
-    source === 'exercisedb' ? await fetchExerciseDb() : await fetchFreeExerciseDb()
+  let exercises: Exercise[]
+
+  if (source === 'exercisedb') {
+    // Modo aditivo: mantém o catálogo já existente (free-exercise-db) e acrescenta o
+    // subconjunto prioritário com GIFs reais da ExerciseDB, em vez de substituir tudo
+    // (baixar o GIF de todos os ~1357 exercícios estouraria a cota gratuita mensal).
+    const existing: Exercise[] = JSON.parse(readFileSync(OUT_PATH, 'utf-8'))
+    const curated = await fetchExerciseDbCuratedGifs()
+    const existingWithoutEdb = existing.filter((e) => !e.id.startsWith('edb-'))
+    exercises = [...curated, ...existingWithoutEdb]
+  } else {
+    exercises = await fetchFreeExerciseDb()
+  }
 
   exercises.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
 

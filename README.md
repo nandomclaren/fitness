@@ -97,10 +97,27 @@ para as categorias de força e normalizada para o schema interno do app:
 npm run fetch-exercises
 ```
 
-### Fonte ExerciseDB (RapidAPI) — biblioteca com GIFs animados
+### Fonte ExerciseDB (RapidAPI) — GIFs animados reais (subconjunto prioritário)
 
-Para usar a **ExerciseDB**, que fornece GIFs animados reais de execução (em vez das duas
-fotos estáticas do free-exercise-db), é necessário uma chave gratuita da RapidAPI:
+A **ExerciseDB** fornece GIFs animados reais de execução (em vez das duas fotos estáticas
+do free-exercise-db). Duas limitações técnicas importantes descobertas na prática:
+
+1. A listagem da API **não retorna mais o `gifUrl` direto** — o GIF só vem de um endpoint
+   separado (`/image?exerciseId=...`), que exige o header `X-RapidAPI-Key` em toda
+   chamada. Uma tag `<img>` no navegador não consegue enviar esse header, então **não dá
+   pra simplesmente linkar a URL da imagem** — o GIF precisa ser baixado por este script
+   (que tem a chave) e re-hospedado em `public/exercises/gifs/`.
+2. O plano gratuito da RapidAPI tem uma cota de **690 requisições/mês**. Cada exercício
+   custa 1 requisição pra listar + 1 requisição pra baixar o GIF. Baixar o GIF dos
+   ~1.357 exercícios da base estouraria a cota em um único mês.
+
+Por isso, o modo `--source=exercisedb` funciona de forma **aditiva e curada**: baixa a
+lista completa de metadados (barata — a listagem pagina 10 por vez, ~140 requisições no
+total), escolhe até **15 exercícios "âncora" por grupo muscular** (priorizando
+barra/halteres/máquina, mesma lógica de `src/lib/routine.ts`), baixa o GIF real só
+desses (~200-250 requisições) e **acrescenta** esse subconjunto ao catálogo existente do
+free-exercise-db — sem substituir nem remover nada. Assim o catálogo cresce com GIFs de
+alta qualidade para os exercícios mais usados, cabendo na cota gratuita mensal.
 
 1. Crie uma conta em [rapidapi.com](https://rapidapi.com).
 2. Acesse a página da [ExerciseDB API](https://rapidapi.com/exercisedb/api/exercisedb) e
@@ -115,9 +132,12 @@ fotos estáticas do free-exercise-db), é necessário uma chave gratuita da Rapi
 
    No Windows (PowerShell): `$env:RAPIDAPI_KEY="sua_chave_aqui"; npm run fetch-exercises -- --source=exercisedb`
 
-O script pagina automaticamente por toda a base, normaliza os nomes de músculos para a
-taxonomia interna (`src/types/muscle.ts`) e sobrescreve `src/data/exercises.json`. Depois
-é só commitar o arquivo atualizado. **Nunca cole a chave em código, commits ou chats.**
+O script normaliza os nomes de músculos para a taxonomia interna (`src/types/muscle.ts`),
+salva os GIFs em `public/exercises/gifs/*.gif` e atualiza `src/data/exercises.json`.
+Depois é só commitar os dois (arquivo JSON + pasta de GIFs). Rodar de novo é seguro —
+o script substitui só os exercícios com prefixo `edb-` do run anterior, sem duplicar.
+Quer aumentar a cobertura? Ajuste `MAX_GIFS_PER_MUSCLE` no script (de olho na cota
+mensal). **Nunca cole a chave em código, commits ou chats.**
 
 ### Schema de cada exercício
 

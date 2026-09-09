@@ -45,8 +45,11 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,gif,webp}'],
-        // GIFs de exercícios são grandes: cacheia sob demanda (runtime), não no precache
+        // Sem gif/webp aqui de propósito: são os GIFs de exercício (public/exercises/gifs),
+        // pesados demais pra baixar tudo de uma vez no primeiro acesso — ficam de fora do
+        // precache e são cacheados sob demanda pela regra runtimeCaching abaixo, só quando
+        // o usuário realmente abre aquele exercício.
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
           {
