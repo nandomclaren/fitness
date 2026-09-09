@@ -1,0 +1,48 @@
+{
+  "name": "fitness",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "server:dev": "tsx watch server/index.ts",
+    "build": "tsc -b && vite build",
+    "start": "prisma migrate deploy && tsx server/index.ts",
+    "postinstall": "prisma generate",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "fetch-exercises": "tsx scripts/fetch-exercises.ts",
+    "gen-icons": "node scripts/gen-icons.mjs",
+    "db:migrate": "prisma migrate dev"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
+    "@prisma/client": "^6.19.3",
+    "clsx": "^2.1.1",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "lucide-react": "^1.43.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "oxlint": "^1.79.0",
+    "prisma": "^6.19.3",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.13",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2",
+    "vite-plugin-pwa": "^1.3.0"
+  }
+}

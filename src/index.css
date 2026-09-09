@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+
+  --color-bg: #0b0c10;
+  --color-surface: #16181f;
+  --color-surface-raised: #1f222b;
+  --color-border: #2a2d38;
+  --color-text: #f5f6fa;
+  --color-text-muted: #9aa0b4;
+
+  --color-primary: #ff4d4f;
+  --color-primary-dim: #7a1f21;
+  --color-secondary: #ffb020;
+  --color-success: #22c55e;
+  --color-cold: #3a3f4f;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100svh;
+  min-height: 100dvh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Modo TV: tudo maior e com mais contraste para leitura à distância */
+.tv-mode {
+  --tv-scale: 1.35;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
