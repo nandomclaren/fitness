@@ -125,7 +125,7 @@ export default function HomeScreen() {
           <Dumbbell size={24} className="text-white" />
         </div>
         <div className="flex-1">
-          <h1 className="text-xl font-bold leading-tight">Sobrecarga</h1>
+          <h1 className="text-xl font-bold leading-tight">Maromba</h1>
           <p className="text-sm text-(--color-text-muted)">Seu personal trainer digital</p>
         </div>
       </header>

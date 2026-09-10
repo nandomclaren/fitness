@@ -1,4 +1,4 @@
-# Sobrecarga — Treino de Musculação e Sobrecarga Progressiva
+# Maromba — Treino de Musculação e Sobrecarga Progressiva
 
 Um personal trainer digital para rastrear cargas, sugerir progressão de carga
 automaticamente, montar treinos com IA a partir dos seus objetivos e mostrar um resumo

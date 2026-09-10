@@ -23,8 +23,8 @@ export default defineConfig({
       manifest: {
         id: '.',
         lang: 'pt-BR',
-        name: 'Sobrecarga - Treino de Musculação',
-        short_name: 'Sobrecarga',
+        name: 'Maromba - Treino de Musculação',
+        short_name: 'Maromba',
         description:
           'Personal trainer digital: registro de cargas, sobrecarga progressiva e resumo pós-treino com mapa muscular.',
         theme_color: '#0b0c10',
