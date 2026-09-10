@@ -7,6 +7,7 @@ import GoalsScreen from './screens/GoalsScreen'
 import HistoryScreen from './screens/HistoryScreen'
 import WarmupScreen from './screens/WarmupScreen'
 import CooldownScreen from './screens/CooldownScreen'
+import CoachScreen from './screens/CoachScreen'
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
       <Route path="/onboarding" element={<OnboardingScreen />} />
       <Route path="/objetivos" element={<GoalsScreen />} />
       <Route path="/historico" element={<HistoryScreen />} />
+      <Route path="/coach" element={<CoachScreen />} />
       <Route path="/aquecimento" element={<WarmupScreen />} />
       <Route path="/treino" element={<PlayerScreen />} />
       <Route path="/desaquecimento/:sessionId" element={<CooldownScreen />} />

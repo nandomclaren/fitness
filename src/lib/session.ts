@@ -1,12 +1,13 @@
 import { api } from './api.ts'
 import type { MuscleId } from '../types/muscle.ts'
-import type { SetEntry, WorkoutSession, WorkoutSplit } from '../types/workout.ts'
+import type { SetEntry, WorkoutSession } from '../types/workout.ts'
 
 export async function startSession(
-  split: WorkoutSplit,
+  split: string,
   exerciseIds: string[],
+  planRoutineId?: string,
 ): Promise<WorkoutSession> {
-  return api.post<WorkoutSession>('/sessions', { split, exerciseIds })
+  return api.post<WorkoutSession>('/sessions', { split, exerciseIds, planRoutineId })
 }
 
 export interface LogSetInput {
@@ -49,7 +50,7 @@ export async function getSessionSummary(sessionId: string): Promise<SessionSumma
 
 export interface SessionListItem {
   id: string
-  split: WorkoutSplit
+  split: string
   startedAt: string
   finishedAt: string
   totalSets: number

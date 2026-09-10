@@ -1,11 +1,14 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import type { WorkoutSession, WorkoutSplit } from '../types/workout'
+import type { WorkoutSession } from '../types/workout'
 import type { RoutineItem } from './prescription.ts'
 import { startSession as startSessionInDb, finishSession as finishSessionInDb } from './session'
 
 interface PendingWorkout {
-  split: WorkoutSplit
+  /** Split (upper/lower/full/core) ou label de rotina de um plano do coach (ex.: "A"). */
+  split: string
   routineItems: RoutineItem[]
+  /** Presente quando o treino vem de um WorkoutPlan aprovado, pra registrar a rotação A/B. */
+  planRoutineId?: string
 }
 
 interface WorkoutContextValue {
@@ -18,7 +21,7 @@ interface WorkoutContextValue {
   pendingWorkout: PendingWorkout | null
   setTvMode: (on: boolean) => void
   /** Guarda a rotina escolhida sem iniciar a sessão ainda — usado pela tela de aquecimento. */
-  preparePendingWorkout: (split: WorkoutSplit, routineItems: RoutineItem[]) => void
+  preparePendingWorkout: (split: string, routineItems: RoutineItem[], planRoutineId?: string) => void
   /** Inicia de fato a sessão (grava no banco) a partir do que foi preparado. */
   beginPreparedWorkout: () => Promise<void>
   goToNextExercise: () => void
@@ -35,8 +38,8 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
   const [isTvMode, setTvMode] = useState(false)
   const [pendingWorkout, setPendingWorkout] = useState<PendingWorkout | null>(null)
 
-  const preparePendingWorkout = (split: WorkoutSplit, items: RoutineItem[]) => {
-    setPendingWorkout({ split, routineItems: items })
+  const preparePendingWorkout = (split: string, items: RoutineItem[], planRoutineId?: string) => {
+    setPendingWorkout({ split, routineItems: items, planRoutineId })
   }
 
   const beginPreparedWorkout = async () => {
@@ -44,6 +47,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     const newSession = await startSessionInDb(
       pendingWorkout.split,
       pendingWorkout.routineItems.map((item) => item.exercise.id),
+      pendingWorkout.planRoutineId,
     )
     setSession(newSession)
     setRoutineItems(pendingWorkout.routineItems)

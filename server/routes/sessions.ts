@@ -7,12 +7,18 @@ import type { MuscleId } from '../../src/types/muscle.ts'
 export const sessionsRouter = Router()
 
 sessionsRouter.post('/sessions', async (req, res) => {
-  const { split, exerciseIds } = req.body as { split: string; exerciseIds: string[] }
+  const { split, exerciseIds, planRoutineId } = req.body as {
+    split: string
+    exerciseIds: string[]
+    planRoutineId?: string
+  }
   if (!split || !Array.isArray(exerciseIds) || exerciseIds.length === 0) {
     res.status(400).json({ error: 'split e exerciseIds são obrigatórios' })
     return
   }
-  const session = await prisma.workoutSession.create({ data: { split, exerciseIds } })
+  const session = await prisma.workoutSession.create({
+    data: { split, exerciseIds, planRoutineId },
+  })
   res.json(session)
 })
 

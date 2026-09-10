@@ -13,7 +13,8 @@ export interface SetEntry {
 
 export interface WorkoutSession {
   id: string
-  split: WorkoutSplit
+  /** Split (upper/lower/full/core) ou label de rotina de um plano do coach (ex.: "A"). */
+  split: string
   exerciseIds: string[]
   startedAt: string
   finishedAt: string | null

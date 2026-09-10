@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Clock, Dumbbell, GripVertical, History, Plus, Settings, Sparkles, X } from 'lucide-react'
+import { Clock, Dumbbell, GripVertical, Plus, Sparkles, X } from 'lucide-react'
+import BottomTabBar from '../components/BottomTabBar'
 import { buildSuggestedRoutine, SPLIT_LABELS_PT } from '../lib/routine'
 import { useWorkout } from '../lib/workout-context'
 import { getGoals } from '../lib/goals.ts'
 import { api } from '../lib/api.ts'
+import { getActivePlan } from '../lib/coach.ts'
 import { getExercise } from '../lib/exercises.ts'
-import { buildRoutineItems, estimateWorkoutMinutes } from '../lib/prescription.ts'
+import { buildRoutineItems, estimateWorkoutMinutes, type RoutineItem } from '../lib/prescription.ts'
 import { MUSCLE_LABELS_PT } from '../types/muscle'
 import type { UserGoals } from '../types/goals.ts'
 import type { Exercise } from '../types/exercise'
 import type { WorkoutSplit } from '../types/workout'
+import type { ActiveWorkoutPlan } from '../types/coach.ts'
 import ExercisePicker from '../components/ExercisePicker'
 
 const SPLITS: WorkoutSplit[] = ['upper', 'lower', 'full', 'core']
@@ -29,16 +32,49 @@ export default function HomeScreen() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiRationale, setAiRationale] = useState<string | null>(null)
+  const [activePlan, setActivePlan] = useState<ActiveWorkoutPlan | null | undefined>(undefined)
+  const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null)
+  const [useAutoInstead, setUseAutoInstead] = useState(false)
 
   useEffect(() => {
     getGoals().then((g) => {
       if (!g) navigate('/onboarding', { replace: true })
       else setGoals(g)
     })
+    getActivePlan().then((plan) => {
+      setActivePlan(plan)
+      if (plan) setSelectedRoutineId(plan.nextRoutineId ?? plan.routines[0]?.id ?? null)
+    })
   }, [navigate])
 
   const routineItems = useMemo(() => buildRoutineItems(routine, goals), [routine, goals])
   const estimatedMinutes = useMemo(() => estimateWorkoutMinutes(routineItems), [routineItems])
+
+  const selectedRoutine = activePlan?.routines.find((r) => r.id === selectedRoutineId) ?? null
+  const planRoutineItems: RoutineItem[] = useMemo(() => {
+    if (!selectedRoutine) return []
+    return selectedRoutine.exercises
+      .map((pe) => {
+        const exercise = getExercise(pe.exerciseId)
+        if (!exercise) return null
+        return {
+          exercise,
+          prescription: {
+            sets: pe.sets,
+            repRangeMin: pe.repRangeMin,
+            repRangeMax: pe.repRangeMax,
+            restSeconds: pe.restSeconds,
+          },
+        }
+      })
+      .filter((item): item is RoutineItem => item !== null)
+  }, [selectedRoutine])
+  const planEstimatedMinutes = useMemo(
+    () => estimateWorkoutMinutes(planRoutineItems),
+    [planRoutineItems],
+  )
+
+  const showPlanMode = !!activePlan && !useAutoInstead
 
   function selectSplit(s: WorkoutSplit) {
     setSplit(s)
@@ -76,8 +112,14 @@ export default function HomeScreen() {
     navigate('/aquecimento')
   }
 
+  function handleStartPlan() {
+    if (!selectedRoutine || planRoutineItems.length === 0) return
+    preparePendingWorkout(selectedRoutine.label, planRoutineItems, selectedRoutine.id)
+    navigate('/aquecimento')
+  }
+
   return (
-    <div className="mx-auto flex min-h-svh max-w-lg flex-col px-5 pb-28 pt-10">
+    <div className="mx-auto flex min-h-svh max-w-lg flex-col px-5 pb-44 pt-10">
       <header className="mb-8 flex items-center gap-3">
         <div className="rounded-xl bg-(--color-primary) p-2.5">
           <Dumbbell size={24} className="text-white" />
@@ -86,44 +128,103 @@ export default function HomeScreen() {
           <h1 className="text-xl font-bold leading-tight">Sobrecarga</h1>
           <p className="text-sm text-(--color-text-muted)">Seu personal trainer digital</p>
         </div>
-        <button
-          onClick={() => navigate('/historico')}
-          aria-label="Histórico de treinos"
-          className="rounded-full p-2 text-(--color-text-muted) hover:bg-(--color-surface-raised)"
-        >
-          <History size={20} />
-        </button>
-        <button
-          onClick={() => navigate('/objetivos')}
-          aria-label="Revisar objetivos"
-          className="rounded-full p-2 text-(--color-text-muted) hover:bg-(--color-surface-raised)"
-        >
-          <Settings size={20} />
-        </button>
       </header>
 
-      <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-(--color-text-muted)">
-          Qual treino de hoje?
-        </h2>
-        <div className="grid grid-cols-2 gap-3">
-          {SPLITS.map((s) => (
+      {showPlanMode && activePlan && (
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-(--color-text-muted)">
+              Plano do coach
+            </h2>
             <button
-              key={s}
-              onClick={() => selectSplit(s)}
-              className={`rounded-xl border py-4 text-center font-semibold transition-colors ${
-                split === s
-                  ? 'border-(--color-primary) bg-(--color-primary)/15 text-(--color-primary)'
-                  : 'border-(--color-border) bg-(--color-surface) text-(--color-text) hover:bg-(--color-surface-raised)'
-              }`}
+              onClick={() => setUseAutoInstead(true)}
+              className="text-xs font-medium text-(--color-text-muted) underline"
             >
-              {SPLIT_LABELS_PT[s]}
+              Usar sugestão automática
             </button>
-          ))}
-        </div>
-      </section>
+          </div>
+          <p className="mb-3 text-sm font-medium">{activePlan.name}</p>
+          <div className="flex gap-3">
+            {activePlan.routines.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => setSelectedRoutineId(r.id)}
+                className={`flex-1 rounded-xl border py-4 text-center font-semibold transition-colors ${
+                  selectedRoutineId === r.id
+                    ? 'border-(--color-primary) bg-(--color-primary)/15 text-(--color-primary)'
+                    : 'border-(--color-border) bg-(--color-surface) text-(--color-text) hover:bg-(--color-surface-raised)'
+                }`}
+              >
+                Treino {r.label}
+                {activePlan.nextRoutineId === r.id && (
+                  <span className="mt-0.5 block text-xs font-normal text-(--color-text-muted)">
+                    próximo
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
 
-      {split && (
+          <ul className="mt-6 flex flex-col gap-2">
+            {planRoutineItems.map(({ exercise, prescription }) => (
+              <li
+                key={exercise.id}
+                className="flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-3"
+              >
+                <img
+                  src={exercise.gifUrl}
+                  alt=""
+                  className="h-12 w-12 shrink-0 rounded-lg object-cover bg-(--color-surface-raised)"
+                  loading="lazy"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{exercise.name}</p>
+                  <p className="text-xs text-(--color-text-muted)">
+                    {MUSCLE_LABELS_PT[exercise.target]} · {prescription.sets}x
+                    {prescription.repRangeMin}-{prescription.repRangeMax} · desc.{' '}
+                    {prescription.restSeconds}s
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {!showPlanMode && (
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-(--color-text-muted)">
+              Qual treino de hoje?
+            </h2>
+            {activePlan && (
+              <button
+                onClick={() => setUseAutoInstead(false)}
+                className="text-xs font-medium text-(--color-text-muted) underline"
+              >
+                Usar plano do coach
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {SPLITS.map((s) => (
+              <button
+                key={s}
+                onClick={() => selectSplit(s)}
+                className={`rounded-xl border py-4 text-center font-semibold transition-colors ${
+                  split === s
+                    ? 'border-(--color-primary) bg-(--color-primary)/15 text-(--color-primary)'
+                    : 'border-(--color-border) bg-(--color-surface) text-(--color-text) hover:bg-(--color-surface-raised)'
+                }`}
+              >
+                {SPLIT_LABELS_PT[s]}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!showPlanMode && split && (
         <section className="mt-4">
           <button
             onClick={generateWithAi}
@@ -139,7 +240,7 @@ export default function HomeScreen() {
         </section>
       )}
 
-      {split && (
+      {!showPlanMode && split && (
         <section className="mt-6">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-(--color-text-muted)">
@@ -193,8 +294,8 @@ export default function HomeScreen() {
         </section>
       )}
 
-      {split && routineItems.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 mx-auto max-w-lg border-t border-(--color-border) bg-(--color-bg) p-4">
+      {!showPlanMode && split && routineItems.length > 0 && (
+        <div className="fixed inset-x-0 bottom-16 z-10 mx-auto max-w-lg border-t border-(--color-border) bg-(--color-bg) p-4">
           <p className="mb-2 flex items-center justify-center gap-1.5 text-xs text-(--color-text-muted)">
             <Clock size={14} /> ~{estimatedMinutes} min estimados (aquecimento + treino + desaquecimento)
           </p>
@@ -207,6 +308,20 @@ export default function HomeScreen() {
         </div>
       )}
 
+      {showPlanMode && planRoutineItems.length > 0 && (
+        <div className="fixed inset-x-0 bottom-16 z-10 mx-auto max-w-lg border-t border-(--color-border) bg-(--color-bg) p-4">
+          <p className="mb-2 flex items-center justify-center gap-1.5 text-xs text-(--color-text-muted)">
+            <Clock size={14} /> ~{planEstimatedMinutes} min estimados (aquecimento + treino + desaquecimento)
+          </p>
+          <button
+            onClick={handleStartPlan}
+            className="w-full rounded-xl bg-(--color-primary) py-4 text-center text-lg font-bold text-white transition-opacity"
+          >
+            Iniciar Treino {selectedRoutine?.label}
+          </button>
+        </div>
+      )}
+
       {pickerOpen && (
         <ExercisePicker
           excludeIds={new Set(routine.map((e) => e.id))}
@@ -214,6 +329,8 @@ export default function HomeScreen() {
           onClose={() => setPickerOpen(false)}
         />
       )}
+
+      <BottomTabBar />
     </div>
   )
 }

@@ -8,13 +8,16 @@ datasource db {
 }
 
 model WorkoutSession {
-  id          String    @id @default(uuid())
-  split       String
-  exerciseIds String[]
-  startedAt   DateTime  @default(now())
-  finishedAt  DateTime?
-  sets        SetEntry[]
+  id            String    @id @default(uuid())
+  split         String
+  exerciseIds   String[]
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+  sets          SetEntry[]
+  planRoutine   PlanRoutine? @relation(fields: [planRoutineId], references: [id])
+  planRoutineId String?
 
+  @@index([planRoutineId])
   @@map("workout_sessions")
 }
 
@@ -56,4 +59,65 @@ model UserGoals {
   updatedAt     DateTime @updatedAt
 
   @@map("user_goals")
+}
+
+/// Plano estruturado proposto pelo coach de IA (ex.: alternância Treino A/B,
+/// ou um esquema de séries/reps fixo por N semanas). Só passa a valer de fato
+/// (status "active") depois que o usuário aprova explicitamente no chat.
+model WorkoutPlan {
+  id            String        @id @default(uuid())
+  name          String
+  rationale     String
+  durationWeeks Int?
+  status        String        @default("proposed") // proposed | active | archived
+  activatedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  routines      PlanRoutine[]
+  proposedIn    CoachMessage? @relation("ProposedPlan")
+
+  @@map("workout_plans")
+}
+
+/// Uma rotina nomeada dentro do plano (ex.: label "A", "B", ou o nome de um split).
+model PlanRoutine {
+  id        String          @id @default(uuid())
+  plan      WorkoutPlan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planId    String
+  label     String
+  order     Int
+  exercises PlanExercise[]
+  sessions  WorkoutSession[]
+
+  @@index([planId])
+  @@map("plan_routines")
+}
+
+/// Exercício fixo dentro de uma PlanRoutine, com prescrição explícita definida
+/// pelo coach (não recalculada automaticamente pela tabela ACSM/NSCA padrão,
+/// já que aqui é uma decisão específica do coach pra aquele ciclo).
+model PlanExercise {
+  id          String      @id @default(uuid())
+  routine     PlanRoutine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  routineId   String
+  exerciseId  String
+  order       Int
+  sets        Int
+  repRangeMin Int
+  repRangeMax Int
+  restSeconds Int
+
+  @@index([routineId])
+  @@map("plan_exercises")
+}
+
+/// Histórico da conversa com o coach de IA (thread única, uso pessoal).
+model CoachMessage {
+  id             String       @id @default(uuid())
+  role           String // "user" | "assistant"
+  content        String
+  proposedPlan   WorkoutPlan? @relation("ProposedPlan", fields: [proposedPlanId], references: [id])
+  proposedPlanId String?      @unique
+  createdAt      DateTime     @default(now())
+
+  @@map("coach_messages")
 }

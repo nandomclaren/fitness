@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Dumbbell } from 'lucide-react'
+import { ChevronRight, Dumbbell } from 'lucide-react'
 import { listSessions, type SessionListItem } from '../lib/session.ts'
 import { SPLIT_LABELS_PT } from '../lib/routine.ts'
+import BottomTabBar from '../components/BottomTabBar'
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('pt-BR', {
@@ -21,15 +22,8 @@ export default function HistoryScreen() {
   }, [])
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-lg flex-col px-5 py-10">
-      <header className="mb-6 flex items-center gap-3">
-        <button
-          onClick={() => navigate('/')}
-          aria-label="Voltar"
-          className="rounded-full p-2 text-(--color-text-muted) hover:bg-(--color-surface-raised)"
-        >
-          <ChevronLeft size={22} />
-        </button>
+    <div className="mx-auto flex min-h-svh max-w-lg flex-col px-5 pb-24 pt-10">
+      <header className="mb-6">
         <h1 className="text-xl font-bold leading-tight">Histórico de treinos</h1>
       </header>
 
@@ -55,7 +49,8 @@ export default function HistoryScreen() {
             >
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">
-                  {SPLIT_LABELS_PT[s.split]} · {formatDate(s.startedAt)}
+                  {SPLIT_LABELS_PT[s.split as keyof typeof SPLIT_LABELS_PT] ?? s.split} ·{' '}
+                  {formatDate(s.startedAt)}
                 </p>
                 <p className="text-sm text-(--color-text-muted)">
                   {Math.round(s.totalVolumeKg).toLocaleString('pt-BR')} kg · {s.totalSets} séries ·{' '}
@@ -67,6 +62,8 @@ export default function HistoryScreen() {
           </li>
         ))}
       </ul>
+
+      <BottomTabBar />
     </div>
   )
 }
