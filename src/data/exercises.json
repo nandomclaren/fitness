@@ -155,11 +155,12 @@
     "name": "Advanced Kettlebell Windmill",
     "nameEn": "Advanced Kettlebell Windmill",
     "bodyPart": "core",
-    "target": "abs",
+    "target": "obliques",
     "secondaryMuscles": [
       "glutes",
       "hamstrings",
-      "shoulders"
+      "shoulders",
+      "abs"
     ],
     "equipment": "kettlebells",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Advanced_Kettlebell_Windmill/0.jpg",
@@ -1868,12 +1869,13 @@
     "name": "Barbell Leg Twist Press",
     "nameEn": "Barbell Leg Twist Press",
     "bodyPart": "core",
-    "target": "abs",
+    "target": "obliques",
     "secondaryMuscles": [
       "shoulders",
       "triceps",
       "chest",
-      "glutes"
+      "glutes",
+      "abs"
     ],
     "equipment": "barbell",
     "gifUrl": "/exercises/gifs/2811.gif",
@@ -2933,10 +2935,10 @@
     "name": "Barbell Seated Twist",
     "nameEn": "Barbell Seated Twist",
     "bodyPart": "core",
-    "target": "abs",
+    "target": "obliques",
     "secondaryMuscles": [
-      "obliques",
-      "lower_back"
+      "lower_back",
+      "abs"
     ],
     "equipment": "barbell",
     "gifUrl": "/exercises/gifs/0094.gif",
@@ -2974,9 +2976,10 @@
     "name": "Barbell Side Bend",
     "nameEn": "Barbell Side Bend",
     "bodyPart": "core",
-    "target": "abs",
+    "target": "obliques",
     "secondaryMuscles": [
-      "lower_back"
+      "lower_back",
+      "abs"
     ],
     "equipment": "barbell",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Side_Bend/0.jpg",
@@ -3495,10 +3498,10 @@
     "name": "Barbell Standing Twist",
     "nameEn": "Barbell Standing Twist",
     "bodyPart": "core",
-    "target": "abs",
+    "target": "obliques",
     "secondaryMuscles": [
-      "obliques",
-      "lower_back"
+      "lower_back",
+      "abs"
     ],
     "equipment": "barbell",
     "gifUrl": "/exercises/gifs/0112.gif",
@@ -4325,8 +4328,10 @@
     "name": "Bosu Ball Cable Crunch With Side Bends",
     "nameEn": "Bosu Ball Cable Crunch With Side Bends",
     "bodyPart": "core",
-    "target": "abs",
-    "secondaryMuscles": [],
+    "target": "obliques",
+    "secondaryMuscles": [
+      "abs"
+    ],
     "equipment": "cable",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bosu_Ball_Cable_Crunch_With_Side_Bends/0.jpg",
     "loopFrameUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bosu_Ball_Cable_Crunch_With_Side_Bends/1.jpg",
@@ -4858,8 +4863,10 @@
     "name": "Cable Russian Twists",
     "nameEn": "Cable Russian Twists",
     "bodyPart": "core",
-    "target": "abs",
-    "secondaryMuscles": [],
+    "target": "obliques",
+    "secondaryMuscles": [
+      "abs"
+    ],
     "equipment": "cable",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Russian_Twists/0.jpg",
     "loopFrameUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Russian_Twists/1.jpg",
@@ -6041,8 +6048,10 @@
     "name": "Decline Oblique Crunch",
     "nameEn": "Decline Oblique Crunch",
     "bodyPart": "core",
-    "target": "abs",
-    "secondaryMuscles": [],
+    "target": "obliques",
+    "secondaryMuscles": [
+      "abs"
+    ],
     "equipment": "body only",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Decline_Oblique_Crunch/0.jpg",
     "loopFrameUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Decline_Oblique_Crunch/1.jpg",
@@ -6312,12 +6321,13 @@
     "name": "Double Kettlebell Windmill",
     "nameEn": "Double Kettlebell Windmill",
     "bodyPart": "core",
-    "target": "abs",
+    "target": "obliques",
     "secondaryMuscles": [
       "glutes",
       "hamstrings",
       "shoulders",
-      "triceps"
+      "triceps",
+      "abs"
     ],
     "equipment": "kettlebells",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Double_Kettlebell_Windmill/0.jpg",
@@ -7172,9 +7182,9 @@
     "name": "Dumbbell Side Bend",
     "nameEn": "Dumbbell Side Bend",
     "bodyPart": "core",
-    "target": "abs",
+    "target": "obliques",
     "secondaryMuscles": [
-      "obliques"
+      "abs"
     ],
     "equipment": "dumbbell",
     "gifUrl": "/exercises/gifs/0407.gif",
@@ -7190,8 +7200,10 @@
     "name": "Dumbbell Side Bend",
     "nameEn": "Dumbbell Side Bend",
     "bodyPart": "core",
-    "target": "abs",
-    "secondaryMuscles": [],
+    "target": "obliques",
+    "secondaryMuscles": [
+      "abs"
+    ],
     "equipment": "dumbbell",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Side_Bend/0.jpg",
     "loopFrameUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Side_Bend/1.jpg",
@@ -9747,12 +9759,13 @@
     "name": "Kettlebell Windmill",
     "nameEn": "Kettlebell Windmill",
     "bodyPart": "core",
-    "target": "abs",
+    "target": "obliques",
     "secondaryMuscles": [
       "glutes",
       "hamstrings",
       "shoulders",
-      "triceps"
+      "triceps",
+      "abs"
     ],
     "equipment": "kettlebells",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Kettlebell_Windmill/0.jpg",
@@ -9832,8 +9845,10 @@
     "name": "Kneeling Cable Crunch With Alternating Oblique Twists",
     "nameEn": "Kneeling Cable Crunch With Alternating Oblique Twists",
     "bodyPart": "core",
-    "target": "abs",
-    "secondaryMuscles": [],
+    "target": "obliques",
+    "secondaryMuscles": [
+      "abs"
+    ],
     "equipment": "cable",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Kneeling_Cable_Crunch_With_Alternating_Oblique_Twists/0.jpg",
     "loopFrameUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Kneeling_Cable_Crunch_With_Alternating_Oblique_Twists/1.jpg",
@@ -10308,10 +10323,10 @@
     "name": "Lever Kneeling Twist",
     "nameEn": "Lever Kneeling Twist",
     "bodyPart": "core",
-    "target": "abs",
+    "target": "obliques",
     "secondaryMuscles": [
-      "obliques",
-      "lower_back"
+      "lower_back",
+      "abs"
     ],
     "equipment": "leverage machine",
     "gifUrl": "/exercises/gifs/0583.gif",
@@ -11486,8 +11501,10 @@
     "name": "Oblique Crunches",
     "nameEn": "Oblique Crunches",
     "bodyPart": "core",
-    "target": "abs",
-    "secondaryMuscles": [],
+    "target": "obliques",
+    "secondaryMuscles": [
+      "abs"
+    ],
     "equipment": "body only",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Oblique_Crunches/0.jpg",
     "loopFrameUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Oblique_Crunches/1.jpg",
@@ -11506,8 +11523,10 @@
     "name": "Oblique Crunches - On The Floor",
     "nameEn": "Oblique Crunches - On The Floor",
     "bodyPart": "core",
-    "target": "abs",
-    "secondaryMuscles": [],
+    "target": "obliques",
+    "secondaryMuscles": [
+      "abs"
+    ],
     "equipment": "body only",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Oblique_Crunches_-_On_The_Floor/0.jpg",
     "loopFrameUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Oblique_Crunches_-_On_The_Floor/1.jpg",
@@ -11734,8 +11753,10 @@
     "name": "One-arm High-pulley Cable Side Bends",
     "nameEn": "One-Arm High-Pulley Cable Side Bends",
     "bodyPart": "core",
-    "target": "abs",
-    "secondaryMuscles": [],
+    "target": "obliques",
+    "secondaryMuscles": [
+      "abs"
+    ],
     "equipment": "cable",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/One-Arm_High-Pulley_Cable_Side_Bends/0.jpg",
     "loopFrameUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/One-Arm_High-Pulley_Cable_Side_Bends/1.jpg",
@@ -12271,11 +12292,12 @@
     "name": "Pallof Press With Rotation",
     "nameEn": "Pallof Press With Rotation",
     "bodyPart": "core",
-    "target": "abs",
+    "target": "obliques",
     "secondaryMuscles": [
       "chest",
       "shoulders",
-      "triceps"
+      "triceps",
+      "abs"
     ],
     "equipment": "cable",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pallof_Press_With_Rotation/0.jpg",
@@ -12534,8 +12556,10 @@
     "name": "Plate Twist",
     "nameEn": "Plate Twist",
     "bodyPart": "core",
-    "target": "abs",
-    "secondaryMuscles": [],
+    "target": "obliques",
+    "secondaryMuscles": [
+      "abs"
+    ],
     "equipment": "other",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Plate_Twist/0.jpg",
     "loopFrameUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Plate_Twist/1.jpg",
@@ -13997,9 +14021,10 @@
     "name": "Rotação Russa (Russian Twist)",
     "nameEn": "Russian Twist",
     "bodyPart": "core",
-    "target": "abs",
+    "target": "obliques",
     "secondaryMuscles": [
-      "lower_back"
+      "lower_back",
+      "abs"
     ],
     "equipment": "body only",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Russian_Twist/0.jpg",
@@ -14101,8 +14126,10 @@
     "name": "Seated Barbell Twist",
     "nameEn": "Seated Barbell Twist",
     "bodyPart": "core",
-    "target": "abs",
-    "secondaryMuscles": [],
+    "target": "obliques",
+    "secondaryMuscles": [
+      "abs"
+    ],
     "equipment": "barbell",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Barbell_Twist/0.jpg",
     "loopFrameUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Barbell_Twist/1.jpg",
@@ -16313,9 +16340,10 @@
     "name": "Standing Cable Wood Chop",
     "nameEn": "Standing Cable Wood Chop",
     "bodyPart": "core",
-    "target": "abs",
+    "target": "obliques",
     "secondaryMuscles": [
-      "shoulders"
+      "shoulders",
+      "abs"
     ],
     "equipment": "cable",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Cable_Wood_Chop/0.jpg",
@@ -17850,8 +17878,10 @@
     "name": "Weighted Ball Side Bend",
     "nameEn": "Weighted Ball Side Bend",
     "bodyPart": "core",
-    "target": "abs",
-    "secondaryMuscles": [],
+    "target": "obliques",
+    "secondaryMuscles": [
+      "abs"
+    ],
     "equipment": "exercise ball",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Weighted_Ball_Side_Bend/0.jpg",
     "loopFrameUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Weighted_Ball_Side_Bend/1.jpg",
