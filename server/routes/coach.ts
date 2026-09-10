@@ -79,6 +79,11 @@ const SYSTEM_PROMPT =
   'contexto suficiente — faça perguntas antes se precisar (frequência semanal, quais treinos ' +
   'estão travados, dores/limitações).\n' +
   '- exerciseId sempre vem do catálogo fornecido — nunca invente IDs.\n' +
+  '- O catálogo cobre SÓ exercícios de força/musculação — não tem cardio (corrida, ' +
+  'caminhada, remo, bike, natação etc.). Se o usuário descrever uma rotina ou agenda de ' +
+  'cardio, NÃO tente encaixar isso em propose_plan (não existe exerciseId pra isso, a ' +
+  'chamada falha silenciosamente). Trate cardio como orientação em texto normal na ' +
+  'conversa; use propose_plan só pra estruturar os dias de musculação, se houver.\n' +
   '- Depois de chamar propose_plan, o plano fica pendente de aprovação explícita do usuário ' +
   'na interface — você não precisa pedir confirmação de novo no texto, só resumir o que foi ' +
   'proposto.\n\n' +
@@ -231,6 +236,7 @@ coachRouter.post('/coach/messages', async (req, res) => {
     const toolUse = response.content.find((b) => b.type === 'tool_use')
 
     let proposedPlanId: string | undefined
+    let planCreationFailed = false
 
     if (toolUse && toolUse.type === 'tool_use' && toolUse.name === 'propose_plan') {
       const input = toolUse.input as {
@@ -280,15 +286,30 @@ coachRouter.post('/coach/messages', async (req, res) => {
           },
         })
         proposedPlanId = plan.id
+      } else {
+        planCreationFailed = true
       }
     }
 
+    // O texto de "plano proposto" só pode aparecer quando um plano de verdade foi
+    // criado (proposedPlanId setado) — senão a mensagem mente sobre um card que não
+    // existe. Isso acontece, por exemplo, quando a IA tenta encaixar num plano
+    // atividades fora do catálogo (cardio como corrida/caminhada/remo), e todos os
+    // exerciseIds inventados são filtrados por não existirem de verdade.
+    let replyContent = replyText
+    if (!replyContent) {
+      replyContent = proposedPlanId
+        ? 'Plano proposto — veja o card acima para aprovar.'
+        : planCreationFailed
+          ? 'Não consegui montar um plano estruturado a partir disso — meu catálogo de ' +
+            'exercícios cobre treino de força (musculação), não atividades como corrida, ' +
+            'caminhada ou remo. Me conta a parte de musculação que você quer estruturar, ' +
+            'ou seguimos combinando o cardio só aqui na conversa mesmo.'
+          : 'Ok!'
+    }
+
     const assistantMessage = await prisma.coachMessage.create({
-      data: {
-        role: 'assistant',
-        content: replyText || 'Plano proposto — veja o card acima para aprovar.',
-        proposedPlanId,
-      },
+      data: { role: 'assistant', content: replyContent, proposedPlanId },
       include: { proposedPlan: { include: { routines: { include: { exercises: true } } } } },
     })
 
