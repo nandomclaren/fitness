@@ -115,6 +115,10 @@ model CoachMessage {
   id             String       @id @default(uuid())
   role           String // "user" | "assistant"
   content        String
+  /// Imagens anexadas pelo usuário (ex.: foto de um quadro de treino, print de outro
+  /// app), como data URLs completas ("data:image/jpeg;base64,..."). Reenviadas pra IA
+  /// em turnos seguintes pra manter o contexto visual da conversa.
+  images         String[]     @default([])
   proposedPlan   WorkoutPlan? @relation("ProposedPlan", fields: [proposedPlanId], references: [id])
   proposedPlanId String?      @unique
   createdAt      DateTime     @default(now())

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Send, Sparkles } from 'lucide-react'
+import { Image as ImageIcon, Send, Sparkles, X } from 'lucide-react'
 import {
   approvePlan,
   dismissPlan,
@@ -9,6 +9,34 @@ import {
 import { getExercise } from '../lib/exercises.ts'
 import type { CoachMessage, WorkoutPlan } from '../types/coach.ts'
 import BottomTabBar from '../components/BottomTabBar'
+
+const MAX_IMAGES = 4
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+function MessageImages({ images }: { images: string[] }) {
+  if (images.length === 0) return null
+  return (
+    <div className="mb-2 grid grid-cols-2 gap-1.5">
+      {images.map((src, i) => (
+        <img
+          key={i}
+          src={src}
+          alt="Anexo enviado ao coach"
+          className="h-28 w-full rounded-lg object-cover"
+        />
+      ))}
+    </div>
+  )
+}
 
 function PlanCard({
   plan,
@@ -95,8 +123,11 @@ function PlanCard({
 export default function CoachScreen() {
   const [messages, setMessages] = useState<CoachMessage[] | null>(null)
   const [input, setInput] = useState('')
+  const [pendingImages, setPendingImages] = useState<string[]>([])
+  const [imageError, setImageError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     listCoachMessages().then(setMessages)
@@ -106,10 +137,33 @@ export default function CoachScreen() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, sending])
 
+  async function handleFilesPicked(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setImageError(null)
+    const room = MAX_IMAGES - pendingImages.length
+    const picked = Array.from(files).slice(0, room)
+    if (files.length > room) {
+      setImageError(`Só dá pra anexar até ${MAX_IMAGES} imagens por mensagem.`)
+    }
+    const tooBig = picked.filter((f) => f.size > MAX_IMAGE_BYTES)
+    const okFiles = picked.filter((f) => f.size <= MAX_IMAGE_BYTES)
+    if (tooBig.length > 0) {
+      setImageError(`Imagem muito grande (máx. ${MAX_IMAGE_BYTES / 1024 / 1024}MB): ${tooBig.map((f) => f.name).join(', ')}`)
+    }
+    const dataUrls = await Promise.all(okFiles.map(readFileAsDataUrl))
+    setPendingImages((prev) => [...prev, ...dataUrls])
+  }
+
+  function removePendingImage(index: number) {
+    setPendingImages((prev) => prev.filter((_, i) => i !== index))
+  }
+
   async function handleSend() {
     const content = input.trim()
-    if (!content || sending) return
+    if ((!content && pendingImages.length === 0) || sending) return
+    const images = pendingImages
     setInput('')
+    setPendingImages([])
     setSending(true)
     setMessages((prev) => [
       ...(prev ?? []),
@@ -117,13 +171,14 @@ export default function CoachScreen() {
         id: `tmp-${Date.now()}`,
         role: 'user',
         content,
+        images,
         proposedPlanId: null,
         proposedPlan: null,
         createdAt: new Date().toISOString(),
       },
     ])
     try {
-      const reply = await sendCoachMessage(content)
+      const reply = await sendCoachMessage(content, images)
       setMessages((prev) => [...(prev ?? []), reply])
     } finally {
       setSending(false)
@@ -169,7 +224,8 @@ export default function CoachScreen() {
                     : 'max-w-[90%] rounded-2xl rounded-bl-sm bg-(--color-surface) px-4 py-2.5'
                 }
               >
-                <p className="whitespace-pre-wrap text-sm">{m.content}</p>
+                <MessageImages images={m.images} />
+                {m.content && <p className="whitespace-pre-wrap text-sm">{m.content}</p>}
                 {m.proposedPlan && (
                   <PlanCard
                     plan={m.proposedPlan}
@@ -198,7 +254,43 @@ export default function CoachScreen() {
       </div>
 
       <div className="fixed inset-x-0 bottom-16 z-10 mx-auto max-w-lg border-t border-(--color-border) bg-(--color-bg) p-4">
+        {imageError && <p className="mb-2 text-xs text-(--color-primary)">{imageError}</p>}
+        {pendingImages.length > 0 && (
+          <div className="mb-2 flex gap-2 overflow-x-auto">
+            {pendingImages.map((src, i) => (
+              <div key={i} className="relative shrink-0">
+                <img src={src} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                <button
+                  onClick={() => removePendingImage(i)}
+                  aria-label="Remover imagem"
+                  className="absolute -right-1.5 -top-1.5 rounded-full bg-(--color-bg) p-0.5 text-(--color-text-muted) shadow"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => {
+              handleFilesPicked(e.target.files)
+              e.target.value = ''
+            }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={pendingImages.length >= MAX_IMAGES}
+            aria-label="Anexar imagem"
+            className="rounded-xl border border-(--color-border) p-3 text-(--color-text-muted) disabled:opacity-40"
+          >
+            <ImageIcon size={18} />
+          </button>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -214,7 +306,7 @@ export default function CoachScreen() {
           />
           <button
             onClick={handleSend}
-            disabled={sending || !input.trim()}
+            disabled={sending || (!input.trim() && pendingImages.length === 0)}
             aria-label="Enviar"
             className="rounded-xl bg-(--color-primary) p-3 text-white disabled:opacity-40"
           >

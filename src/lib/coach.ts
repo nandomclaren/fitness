@@ -5,8 +5,8 @@ export async function listCoachMessages(): Promise<CoachMessage[]> {
   return api.get<CoachMessage[]>('/coach/messages')
 }
 
-export async function sendCoachMessage(content: string): Promise<CoachMessage> {
-  return api.post<CoachMessage>('/coach/messages', { content })
+export async function sendCoachMessage(content: string, images?: string[]): Promise<CoachMessage> {
+  return api.post<CoachMessage>('/coach/messages', { content, images })
 }
 
 export async function approvePlan(planId: string): Promise<void> {

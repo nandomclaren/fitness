@@ -13,7 +13,9 @@ const distDir = path.resolve(__dirname, '..', 'dist')
 
 const app = express()
 app.use(cors())
-app.use(express.json())
+// Limite maior que o padrão (100kb) pra caber fotos anexadas no chat do coach
+// (imagens em base64 dentro do JSON).
+app.use(express.json({ limit: '25mb' }))
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 

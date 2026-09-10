@@ -37,6 +37,8 @@ export interface CoachMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
+  /** Data URLs ("data:image/jpeg;base64,...") anexadas pelo usuário. */
+  images: string[]
   proposedPlanId: string | null
   proposedPlan: WorkoutPlan | null
   createdAt: string

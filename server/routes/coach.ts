@@ -81,7 +81,48 @@ const SYSTEM_PROMPT =
   '- exerciseId sempre vem do catálogo fornecido — nunca invente IDs.\n' +
   '- Depois de chamar propose_plan, o plano fica pendente de aprovação explícita do usuário ' +
   'na interface — você não precisa pedir confirmação de novo no texto, só resumir o que foi ' +
-  'proposto.'
+  'proposto.\n\n' +
+  'O usuário pode anexar fotos (planilha ou caderno de treino escrito à mão, quadro de ' +
+  'academia, print de outro app, foto do display de uma máquina, etc.). Leia atentamente o ' +
+  'conteúdo da imagem — nomes de exercícios, cargas, séries, repetições, datas — antes de ' +
+  'responder, e transcreva os dados relevantes na sua resposta pra confirmar que leu certo ' +
+  '(letra ruim ou fotos tortas podem gerar erro de leitura; se algum número ficar ambíguo, ' +
+  'pergunte em vez de chutar). Nunca invente um exerciseId a partir da imagem sem achar o ' +
+  'equivalente real no catálogo fornecido.'
+
+const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+const MAX_IMAGES_PER_MESSAGE = 4
+
+interface ParsedImage {
+  mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
+  data: string
+}
+
+/** Faz o parse de uma data URL ("data:image/jpeg;base64,...") pro formato aceito pela API da Anthropic. */
+function parseImageDataUrl(dataUrl: string): ParsedImage | null {
+  const match = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/.exec(dataUrl)
+  if (!match) return null
+  const [, mediaType, data] = match
+  if (!SUPPORTED_IMAGE_TYPES.has(mediaType)) return null
+  return { mediaType: mediaType as ParsedImage['mediaType'], data }
+}
+
+/** Monta o content multimodal (texto + imagens) de uma mensagem pro formato da API da Anthropic. */
+function toAnthropicContent(message: { content: string; images: string[] }): Anthropic.MessageParam['content'] {
+  const images = message.images
+    .map(parseImageDataUrl)
+    .filter((img): img is ParsedImage => img !== null)
+  if (images.length === 0) return message.content
+
+  const blocks: Anthropic.ContentBlockParam[] = images.map((img) => ({
+    type: 'image' as const,
+    source: { type: 'base64' as const, media_type: img.mediaType, data: img.data },
+  }))
+  if (message.content.trim()) {
+    blocks.push({ type: 'text', text: message.content })
+  }
+  return blocks
+}
 
 interface HistorySession {
   split: string
@@ -142,13 +183,20 @@ coachRouter.get('/coach/messages', async (_req, res) => {
 })
 
 coachRouter.post('/coach/messages', async (req, res) => {
-  const { content } = req.body as { content: string }
-  if (!content?.trim()) {
+  const { content, images } = req.body as { content: string; images?: string[] }
+  const safeImages = Array.isArray(images) ? images.slice(0, MAX_IMAGES_PER_MESSAGE) : []
+  if (!content?.trim() && safeImages.length === 0) {
     res.status(400).json({ error: 'mensagem vazia' })
     return
   }
+  if (safeImages.some((img) => !parseImageDataUrl(img))) {
+    res.status(400).json({ error: 'formato de imagem não suportado (use jpeg, png, gif ou webp)' })
+    return
+  }
 
-  await prisma.coachMessage.create({ data: { role: 'user', content } })
+  await prisma.coachMessage.create({
+    data: { role: 'user', content: content ?? '', images: safeImages },
+  })
 
   const priorMessages = await prisma.coachMessage.findMany({
     orderBy: { createdAt: 'asc' },
@@ -174,7 +222,7 @@ coachRouter.post('/coach/messages', async (req, res) => {
       ],
       messages: priorMessages.map((m) => ({
         role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
-        content: m.content,
+        content: toAnthropicContent(m),
       })),
     })
 
