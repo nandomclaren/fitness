@@ -6,7 +6,10 @@ export interface SetEntry {
   exerciseId: string
   setNumber: number
   weightKg: number
+  /** Reps feitas de um lado (exercícios unilaterais) ou reps normais (sides=1). */
   reps: number
+  /** 1 = bilateral/normal; 2 = exercício unilateral, reps feitas dos dois lados. */
+  sides: number
   rpe: number
   completedAt: string
 }
@@ -23,6 +26,7 @@ export interface WorkoutSession {
 export interface LastPerformance {
   weightKg: number
   reps: number
+  sides: number
   rpe: number
   completedAt: string
 }

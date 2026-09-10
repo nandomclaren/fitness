@@ -6,6 +6,11 @@ import type { MuscleId } from '../../src/types/muscle.ts'
 
 export const sessionsRouter = Router()
 
+/** Volume de uma série: peso × reps × lados (exercícios unilaterais valem pelos dois lados). */
+function setVolume(s: { weightKg: number; reps: number; sides: number }): number {
+  return s.weightKg * s.reps * s.sides
+}
+
 sessionsRouter.post('/sessions', async (req, res) => {
   const { split, exerciseIds, planRoutineId } = req.body as {
     split: string
@@ -38,7 +43,7 @@ sessionsRouter.get('/sessions', async (req, res) => {
       finishedAt: s.finishedAt,
       totalSets: s.sets.length,
       totalExercises: new Set(s.sets.map((set) => set.exerciseId)).size,
-      totalVolumeKg: s.sets.reduce((sum, set) => sum + set.weightKg * set.reps, 0),
+      totalVolumeKg: s.sets.reduce((sum, set) => sum + setVolume(set), 0),
     })),
   )
 })
@@ -53,16 +58,17 @@ sessionsRouter.post('/sessions/:id/finish', async (req, res) => {
 
 sessionsRouter.post('/sessions/:id/sets', async (req, res) => {
   const sessionId = req.params.id
-  const { exerciseId, setNumber, weightKg, reps, rpe } = req.body as {
+  const { exerciseId, setNumber, weightKg, reps, rpe, sides } = req.body as {
     exerciseId: string
     setNumber: number
     weightKg: number
     reps: number
     rpe: number
+    sides?: number
   }
 
   const set = await prisma.setEntry.create({
-    data: { sessionId, exerciseId, setNumber, weightKg, reps, rpe },
+    data: { sessionId, exerciseId, setNumber, weightKg, reps, rpe, sides: sides ?? 1 },
   })
 
   const e1rm = estimateOneRepMax(weightKg, reps)
@@ -111,6 +117,7 @@ sessionsRouter.get('/exercises/:exerciseId/last-performance', async (req, res) =
   res.json({
     weightKg: topSet.weightKg,
     reps: topSet.reps,
+    sides: topSet.sides,
     rpe: topSet.rpe,
     completedAt: topSet.completedAt,
   })
@@ -128,7 +135,7 @@ sessionsRouter.get('/sessions/:id/summary', async (req, res) => {
     orderBy: [{ completedAt: 'asc' }, { setNumber: 'asc' }],
   })
 
-  const totalVolumeKg = sets.reduce((sum, s) => sum + s.weightKg * s.reps, 0)
+  const totalVolumeKg = sets.reduce((sum, s) => sum + setVolume(s), 0)
   const startedAt = session.startedAt.getTime()
   const finishedAt = session.finishedAt ? session.finishedAt.getTime() : Date.now()
   const durationMinutes = Math.round((finishedAt - startedAt) / 60000)
@@ -141,7 +148,7 @@ sessionsRouter.get('/sessions/:id/summary', async (req, res) => {
     if (!exercise) continue
     const volume = sets
       .filter((s) => s.exerciseId === exerciseId)
-      .reduce((sum, s) => sum + s.weightKg * s.reps, 0)
+      .reduce((sum, s) => sum + setVolume(s), 0)
     muscleLoad[exercise.target] = (muscleLoad[exercise.target] ?? 0) + volume
     for (const secondary of exercise.secondaryMuscles) {
       muscleLoad[secondary] = (muscleLoad[secondary] ?? 0) + volume * 0.4

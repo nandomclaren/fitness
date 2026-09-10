@@ -17,6 +17,8 @@ export interface LogSetInput {
   weightKg: number
   reps: number
   rpe: number
+  /** 1 = normal; 2 = exercício unilateral, reps feitas dos dois lados. */
+  sides: number
 }
 
 export interface LogSetResult {

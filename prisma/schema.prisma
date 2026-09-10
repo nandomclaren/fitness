@@ -28,7 +28,10 @@ model SetEntry {
   exerciseId  String
   setNumber   Int
   weightKg    Float
+  /// Reps feitas de um lado (exercícios unilaterais) ou reps normais (sides=1).
   reps        Int
+  /// 1 = bilateral/normal; 2 = exercício unilateral, reps feitas dos dois lados.
+  sides       Int            @default(1)
   rpe         Int
   completedAt DateTime       @default(now())
 

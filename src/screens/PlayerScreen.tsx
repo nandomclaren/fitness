@@ -14,11 +14,18 @@ import {
 import { useWorkout } from '../lib/workout-context'
 import { getLastPerformance, suggestNextLoad } from '../lib/progression'
 import { logSet } from '../lib/session'
+import { isUnilateralExercise } from '../lib/unilateral'
 import ExerciseMedia from '../components/ExerciseMedia'
 import RestTimer from '../components/RestTimer'
 import CastModal from '../components/CastModal'
 import type { LastPerformance, ProgressionSuggestion, SetEntry } from '../types/workout'
 import { MUSCLE_LABELS_PT } from '../types/muscle'
+
+/** Aceita "," ou "." como separador decimal; string vazia ou inválida vira 0. */
+function parseLocaleNumber(text: string): number {
+  const n = Number(text.replace(',', '.'))
+  return Number.isFinite(n) ? n : 0
+}
 
 export default function PlayerScreen() {
   const navigate = useNavigate()
@@ -41,12 +48,22 @@ export default function PlayerScreen() {
   const [suggestion, setSuggestion] = useState<ProgressionSuggestion | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [loggedSets, setLoggedSets] = useState<SetEntry[]>([])
-  const [weight, setWeight] = useState(0)
-  const [reps, setReps] = useState(10)
-  const [rpe, setRpe] = useState(8)
+  // Guardados como texto (não number) pra não travar no zero: um <input> controlado com
+  // value=number força Number('')=0 de volta pra tela a cada tecla apagada, então o
+  // usuário nunca consegue esvaziar o campo pra digitar outro número por cima.
+  const [weightText, setWeightText] = useState('0')
+  const [repsText, setRepsText] = useState('10')
+  const [rpeText, setRpeText] = useState('8')
+  const weight = parseLocaleNumber(weightText)
+  const reps = parseLocaleNumber(repsText)
+  const rpe = parseLocaleNumber(rpeText)
   const [showRest, setShowRest] = useState(false)
   const [lastPR, setLastPR] = useState(false)
   const [castOpen, setCastOpen] = useState(false)
+  const [showExitConfirm, setShowExitConfirm] = useState(false)
+  // Detecção automática pelo nome do exercício (ver lib/unilateral.ts) — o usuário pode
+  // corrigir manualmente se a detecção errar pra esse exercício específico.
+  const [unilateral, setUnilateral] = useState(false)
 
   // Só valida ao montar: se o usuário cair em /treino sem sessão ativa (ex.: refresh),
   // volta para a Home. Não pode reagir a mudanças posteriores de `session`, senão o
@@ -57,19 +74,35 @@ export default function PlayerScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // O gesto de voltar do Android (swipe na borda) e o botão físico de voltar disparam
+  // popstate como se fosse um tap comum — sem isso, saem do treino sem aviso e perdem
+  // o progresso da sessão em andamento. Empurra um estado extra no histórico assim que
+  // entra no treino; qualquer "voltar" só remove esse estado (sem sair da tela de fato)
+  // e mostra a confirmação em vez de deixar a navegação acontecer.
+  useEffect(() => {
+    window.history.pushState(null, '', window.location.href)
+    function handlePopState() {
+      window.history.pushState(null, '', window.location.href)
+      setShowExitConfirm(true)
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
   useEffect(() => {
     if (!currentExercise || !prescription) return
     let cancelled = false
     setLoadingHistory(true)
     setLoggedSets([])
     setShowRest(false)
+    setUnilateral(isUnilateralExercise(currentExercise))
     getLastPerformance(currentExercise.id).then((lp) => {
       if (cancelled) return
       setLast(lp)
       if (lp) {
         const sug = suggestNextLoad(lp)
         setSuggestion(sug)
-        setWeight(sug.weightKg)
+        setWeightText(String(sug.weightKg))
         // Encaixa a sugestão (baseada no histórico) dentro da faixa de reps prescrita
         // atual — se o objetivo mudou desde a última vez, o histórico pode sugerir um
         // número de reps fora da meta de hoje.
@@ -77,14 +110,14 @@ export default function PlayerScreen() {
           prescription.repRangeMax,
           Math.max(prescription.repRangeMin, sug.reps),
         )
-        setReps(clampedReps)
+        setRepsText(String(clampedReps))
       } else {
         setSuggestion(null)
-        setWeight(0)
+        setWeightText('0')
         // Sem histórico: usa o meio da faixa de reps prescrita como ponto de partida.
-        setReps(Math.round((prescription.repRangeMin + prescription.repRangeMax) / 2))
+        setRepsText(String(Math.round((prescription.repRangeMin + prescription.repRangeMax) / 2)))
       }
-      setRpe(8)
+      setRpeText('8')
       setLoadingHistory(false)
     })
     return () => {
@@ -104,6 +137,7 @@ export default function PlayerScreen() {
       weightKg: weight,
       reps,
       rpe,
+      sides: unilateral ? 2 : 1,
     })
     setLoggedSets((prev) => [...prev, result.set])
     setLastPR(result.isNewPR)
@@ -137,7 +171,7 @@ export default function PlayerScreen() {
     >
       <header className="flex items-center justify-between gap-2 border-b border-(--color-border) p-4">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => setShowExitConfirm(true)}
           aria-label="Sair do treino"
           className="rounded-full p-2 text-(--color-text-muted) hover:bg-(--color-surface-raised)"
         >
@@ -192,13 +226,26 @@ export default function PlayerScreen() {
           )}
         </p>
 
+        <label className="mt-2 flex w-fit items-center gap-2 text-sm text-(--color-text-muted)">
+          <input
+            type="checkbox"
+            checked={unilateral}
+            onChange={(e) => setUnilateral(e.target.checked)}
+            className="h-4 w-4 accent-(--color-primary)"
+          />
+          Um lado de cada vez (registra as reps de cada lado, dobra o volume)
+        </label>
+
         <section className="mt-4 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
           {loadingHistory ? (
             <p className="text-sm text-(--color-text-muted)">Carregando histórico...</p>
           ) : last ? (
             <>
               <p className="text-sm text-(--color-text-muted)">
-                Última sessão: <strong className="text-(--color-text)">{last.weightKg}kg × {last.reps} reps</strong>{' '}
+                Última sessão:{' '}
+                <strong className="text-(--color-text)">
+                  {last.weightKg}kg × {last.reps} reps{last.sides > 1 ? ` (${last.sides} lados)` : ''}
+                </strong>{' '}
                 (RPE {last.rpe})
               </p>
               {suggestion && (
@@ -230,7 +277,8 @@ export default function PlayerScreen() {
                   Série {s.setNumber} de {prescription.sets}
                 </span>
                 <span className="font-medium">
-                  {s.weightKg}kg × {s.reps} reps (RPE {s.rpe})
+                  {s.weightKg}kg × {s.reps} reps{s.sides > 1 ? ` × ${s.sides} lados` : ''} (RPE{' '}
+                  {s.rpe})
                 </span>
               </li>
             ))}
@@ -253,33 +301,35 @@ export default function PlayerScreen() {
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-(--color-text-muted)">Peso (kg)</span>
               <input
-                type="number"
+                type="text"
                 inputMode="decimal"
-                step={0.5}
-                value={weight}
-                onChange={(e) => setWeight(Number(e.target.value))}
+                value={weightText}
+                onChange={(e) => setWeightText(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-3 text-center text-lg font-semibold outline-none focus:border-(--color-primary)"
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-(--color-text-muted)">Reps</span>
+              <span className="text-xs font-medium text-(--color-text-muted)">
+                {unilateral ? 'Reps (por lado)' : 'Reps'}
+              </span>
               <input
-                type="number"
+                type="text"
                 inputMode="numeric"
-                value={reps}
-                onChange={(e) => setReps(Number(e.target.value))}
+                value={repsText}
+                onChange={(e) => setRepsText(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-3 text-center text-lg font-semibold outline-none focus:border-(--color-primary)"
               />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-(--color-text-muted)">RPE (1-10)</span>
               <input
-                type="number"
+                type="text"
                 inputMode="numeric"
-                min={1}
-                max={10}
-                value={rpe}
-                onChange={(e) => setRpe(Number(e.target.value))}
+                value={rpeText}
+                onChange={(e) => setRpeText(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-3 text-center text-lg font-semibold outline-none focus:border-(--color-primary)"
               />
             </label>
@@ -321,6 +371,32 @@ export default function PlayerScreen() {
       </div>
 
       {castOpen && <CastModal onClose={() => setCastOpen(false)} />}
+
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4">
+          <div className="w-full max-w-md rounded-t-2xl border border-(--color-border) bg-(--color-surface) p-5 sm:rounded-2xl">
+            <h2 className="text-lg font-semibold">Sair do treino?</h2>
+            <p className="mt-1 text-sm text-(--color-text-muted)">
+              As séries já registradas ficam salvas, mas o treino não vai ser marcado como
+              concluído e o restante dos exercícios não será feito agora.
+            </p>
+            <div className="mt-4 flex gap-3">
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className="flex-1 rounded-xl bg-(--color-primary) py-3 text-center font-semibold text-white"
+              >
+                Continuar treino
+              </button>
+              <button
+                onClick={() => navigate('/', { replace: true })}
+                className="flex-1 rounded-xl border border-(--color-border) py-3 text-center font-semibold text-(--color-text-muted)"
+              >
+                Sair
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

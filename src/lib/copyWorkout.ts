@@ -31,15 +31,21 @@ export function buildWorkoutCopyText(sets: SetEntry[]): string {
     const isBodyweight = exerciseSets.every((s) => s.weightKg === 0)
     const sameWeight = exerciseSets.every((s) => s.weightKg === exerciseSets[0].weightKg)
     const sameReps = exerciseSets.every((s) => s.reps === exerciseSets[0].reps)
+    const sameSides = exerciseSets.every((s) => s.sides === exerciseSets[0].sides)
 
     let detail: string
     if (sameWeight && sameReps) {
       detail = isBodyweight
         ? `${exerciseSets.length} * ${exerciseSets[0].reps}`
         : `${exerciseSets[0].weightKg} kg * ${exerciseSets.length} * ${exerciseSets[0].reps}`
+      // Reps unilaterais são por lado — anota isso pra não parecer o total.
+      if (sameSides && exerciseSets[0].sides > 1) detail += ' (each side)'
     } else {
       detail = exerciseSets
-        .map((s) => (isBodyweight ? `${s.reps}` : `${s.weightKg}kg x${s.reps}`))
+        .map((s) => {
+          const reps = isBodyweight ? `${s.reps}` : `${s.weightKg}kg x${s.reps}`
+          return s.sides > 1 ? `${reps} (each side)` : reps
+        })
         .join(', ')
     }
 
