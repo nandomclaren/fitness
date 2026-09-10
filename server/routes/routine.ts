@@ -73,8 +73,12 @@ routineRouter.post('/routine/suggested', async (req, res) => {
       : 'Nenhum objetivo cadastrado ainda — use um treino balanceado e genérico para o nível intermediário.'
 
     const response = await client.messages.create({
-      model: 'claude-opus-5',
-      max_tokens: 2048,
+      // Sonnet 5: seleção mecânica de exercícios seguindo regras já explícitas no
+      // prompt — não precisa do topo de linha.
+      model: 'claude-sonnet-5',
+      // Mesmo motivo do endpoint do coach: 2048 é baixo demais pro orçamento de
+      // max_tokens (thinking adaptativo consome do mesmo total).
+      max_tokens: 8000,
       output_config: { effort: 'medium' },
       tools: [PROPOSE_ROUTINE_TOOL],
       tool_choice: { type: 'tool', name: 'propose_routine' },

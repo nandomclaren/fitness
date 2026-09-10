@@ -12,8 +12,9 @@ guarda o histórico num banco Postgres, para acessar de qualquer dispositivo.
   do frontend no mesmo processo.
 - **Banco de dados:** PostgreSQL via Prisma ORM (sessões de treino, séries, recordes
   pessoais e objetivos do usuário).
-- **IA:** [Claude API](https://www.anthropic.com/api) (`claude-opus-5`) para montar a
-  rotina sugerida do dia a partir dos objetivos e do histórico recente.
+- **IA:** [Claude API](https://www.anthropic.com/api) (`claude-sonnet-5`) para montar a
+  rotina sugerida do dia e alimentar o chat do coach, a partir dos objetivos, do
+  histórico recente e (no chat) fotos anexadas.
 - **vite-plugin-pwa:** manifest + service worker, para instalar o app no celular
   (Android/iOS) como ícone de tela inicial.
 
@@ -57,7 +58,7 @@ Veja `.env.example` para a lista completa e comentada. As principais:
 
 Na tela inicial, depois de escolher o tipo de treino, o botão **"Treino sugerido pela
 IA"** chama o endpoint `POST /api/routine/suggested`, que usa a Claude API
-(`claude-opus-5`) para montar a lista de exercícios considerando:
+(`claude-sonnet-5`) para montar a lista de exercícios considerando:
 
 - Seus **objetivos** (definidos no onboarding / tela de Objetivos ⚙️): meta, nível,
   dias por semana, equipamentos disponíveis, limitações/lesões.

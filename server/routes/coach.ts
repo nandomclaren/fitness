@@ -212,8 +212,14 @@ coachRouter.post('/coach/messages', async (req, res) => {
 
   try {
     const response = await client.messages.create({
-      model: 'claude-opus-5',
-      max_tokens: 2048,
+      // Sonnet 5: as regras de prescrição (ACSM/NSCA) já vêm explícitas no prompt, então
+      // o modelo não precisa "descobrir" nada sozinho — Opus seria custo desnecessário
+      // pra esse tipo de tarefa guiada.
+      model: 'claude-sonnet-5',
+      // 2048 era baixo demais: com thinking adaptativo ligado por padrão nos modelos
+      // atuais, o raciocínio consome tokens do mesmo orçamento de max_tokens, e podia
+      // estourar o limite antes de gerar qualquer texto ou tool_use visível.
+      max_tokens: 16000,
       output_config: { effort: 'medium' },
       tools: [PROPOSE_PLAN_TOOL],
       system: [
@@ -305,7 +311,9 @@ coachRouter.post('/coach/messages', async (req, res) => {
             'exercícios cobre treino de força (musculação), não atividades como corrida, ' +
             'caminhada ou remo. Me conta a parte de musculação que você quer estruturar, ' +
             'ou seguimos combinando o cardio só aqui na conversa mesmo.'
-          : 'Ok!'
+          : // Nenhum texto e nenhuma tool_use: resposta veio vazia (ex.: truncada por
+            // max_tokens antes de gerar saída visível). Não inventa "Ok!" — avisa.
+            'Minha resposta ficou incompleta — tenta perguntar de novo.'
     }
 
     const assistantMessage = await prisma.coachMessage.create({
