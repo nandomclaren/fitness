@@ -16,6 +16,17 @@ import type { WorkoutSplit } from '../types/workout'
 import type { ActiveWorkoutPlan } from '../types/coach.ts'
 import ExercisePicker from '../components/ExercisePicker'
 
+/**
+ * Nome curto pra caber nas abas de seleção de rotina — o coach pode nomear rotinas de
+ * forma descritiva (ex.: "A — Full Body (Agachamento/Empurrar)"), o que quebra o layout
+ * de 3 colunas iguais. Pega só o primeiro pedaço antes do separador; o nome completo
+ * continua aparecendo no botão de iniciar treino, que é largura cheia.
+ */
+function shortRoutineLabel(label: string): string {
+  const short = label.split(/[—–(-]/)[0].trim()
+  return short === label ? short : `Treino ${short}`
+}
+
 const SPLITS: WorkoutSplit[] = ['upper', 'lower', 'full', 'core']
 
 interface AiRoutineResponse {
@@ -144,18 +155,18 @@ export default function HomeScreen() {
             </button>
           </div>
           <p className="mb-3 text-sm font-medium">{activePlan.name}</p>
-          <div className="flex gap-3">
+          <div className="grid grid-cols-3 gap-2">
             {activePlan.routines.map((r) => (
               <button
                 key={r.id}
                 onClick={() => setSelectedRoutineId(r.id)}
-                className={`flex-1 rounded-xl border py-4 text-center font-semibold transition-colors ${
+                className={`min-w-0 rounded-xl border py-4 text-center font-semibold transition-colors ${
                   selectedRoutineId === r.id
                     ? 'border-(--color-primary) bg-(--color-primary)/15 text-(--color-primary)'
                     : 'border-(--color-border) bg-(--color-surface) text-(--color-text) hover:bg-(--color-surface-raised)'
                 }`}
               >
-                Treino {r.label}
+                <span className="block truncate px-1">{shortRoutineLabel(r.label)}</span>
                 {activePlan.nextRoutineId === r.id && (
                   <span className="mt-0.5 block text-xs font-normal text-(--color-text-muted)">
                     próximo

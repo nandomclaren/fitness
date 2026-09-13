@@ -164,7 +164,7 @@ export default function SummaryScreen() {
         onClick={() => navigate('/')}
         className="mt-8 w-full rounded-xl bg-(--color-primary) py-4 text-center text-lg font-bold text-white"
       >
-        Novo treino
+        Voltar para a Home
       </button>
     </div>
   )

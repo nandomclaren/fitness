@@ -18,14 +18,9 @@ import { isUnilateralExercise } from '../lib/unilateral'
 import ExerciseMedia from '../components/ExerciseMedia'
 import RestTimer from '../components/RestTimer'
 import CastModal from '../components/CastModal'
+import WheelPicker from '../components/WheelPicker'
 import type { LastPerformance, ProgressionSuggestion, SetEntry } from '../types/workout'
 import { MUSCLE_LABELS_PT } from '../types/muscle'
-
-/** Aceita "," ou "." como separador decimal; string vazia ou inválida vira 0. */
-function parseLocaleNumber(text: string): number {
-  const n = Number(text.replace(',', '.'))
-  return Number.isFinite(n) ? n : 0
-}
 
 export default function PlayerScreen() {
   const navigate = useNavigate()
@@ -48,15 +43,9 @@ export default function PlayerScreen() {
   const [suggestion, setSuggestion] = useState<ProgressionSuggestion | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [loggedSets, setLoggedSets] = useState<SetEntry[]>([])
-  // Guardados como texto (não number) pra não travar no zero: um <input> controlado com
-  // value=number força Number('')=0 de volta pra tela a cada tecla apagada, então o
-  // usuário nunca consegue esvaziar o campo pra digitar outro número por cima.
-  const [weightText, setWeightText] = useState('0')
-  const [repsText, setRepsText] = useState('10')
-  const [rpeText, setRpeText] = useState('8')
-  const weight = parseLocaleNumber(weightText)
-  const reps = parseLocaleNumber(repsText)
-  const rpe = parseLocaleNumber(rpeText)
+  const [weight, setWeight] = useState(0)
+  const [reps, setReps] = useState(10)
+  const [rpe, setRpe] = useState(8)
   const [showRest, setShowRest] = useState(false)
   const [lastPR, setLastPR] = useState(false)
   const [castOpen, setCastOpen] = useState(false)
@@ -102,7 +91,7 @@ export default function PlayerScreen() {
       if (lp) {
         const sug = suggestNextLoad(lp)
         setSuggestion(sug)
-        setWeightText(String(sug.weightKg))
+        setWeight(sug.weightKg)
         // Encaixa a sugestão (baseada no histórico) dentro da faixa de reps prescrita
         // atual — se o objetivo mudou desde a última vez, o histórico pode sugerir um
         // número de reps fora da meta de hoje.
@@ -110,14 +99,14 @@ export default function PlayerScreen() {
           prescription.repRangeMax,
           Math.max(prescription.repRangeMin, sug.reps),
         )
-        setRepsText(String(clampedReps))
+        setReps(clampedReps)
       } else {
         setSuggestion(null)
-        setWeightText('0')
+        setWeight(0)
         // Sem histórico: usa o meio da faixa de reps prescrita como ponto de partida.
-        setRepsText(String(Math.round((prescription.repRangeMin + prescription.repRangeMax) / 2)))
+        setReps(Math.round((prescription.repRangeMin + prescription.repRangeMax) / 2))
       }
-      setRpeText('8')
+      setRpe(8)
       setLoadingHistory(false)
     })
     return () => {
@@ -300,38 +289,25 @@ export default function PlayerScreen() {
           <section className="mt-5 grid grid-cols-3 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-(--color-text-muted)">Peso (kg)</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={weightText}
-                onChange={(e) => setWeightText(e.target.value)}
-                onFocus={(e) => e.target.select()}
-                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-3 text-center text-lg font-semibold outline-none focus:border-(--color-primary)"
+              <WheelPicker
+                ariaLabel="Peso em quilos"
+                value={weight}
+                onChange={setWeight}
+                min={0}
+                max={300}
+                step={0.5}
+                formatValue={(v) => v.toFixed(1)}
               />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-(--color-text-muted)">
                 {unilateral ? 'Reps (por lado)' : 'Reps'}
               </span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={repsText}
-                onChange={(e) => setRepsText(e.target.value)}
-                onFocus={(e) => e.target.select()}
-                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-3 text-center text-lg font-semibold outline-none focus:border-(--color-primary)"
-              />
+              <WheelPicker ariaLabel="Repetições" value={reps} onChange={setReps} min={0} max={50} step={1} />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-(--color-text-muted)">RPE (1-10)</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={rpeText}
-                onChange={(e) => setRpeText(e.target.value)}
-                onFocus={(e) => e.target.select()}
-                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-3 text-center text-lg font-semibold outline-none focus:border-(--color-primary)"
-              />
+              <WheelPicker ariaLabel="RPE" value={rpe} onChange={setRpe} min={1} max={10} step={1} />
             </label>
           </section>
         )}
