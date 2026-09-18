@@ -44,8 +44,8 @@ export default function SummaryScreen() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const { heat, intensity } = useMemo(() => {
-    if (!summary) return { heat: {}, intensity: {} }
+  const heat = useMemo(() => {
+    if (!summary) return {}
 
     const primary = new Set<MuscleId>()
     const secondary = new Set<MuscleId>()
@@ -60,13 +60,7 @@ export default function SummaryScreen() {
     for (const m of secondary) heat[m] = 'secondary'
     for (const m of primary) heat[m] = 'primary' // primário tem precedência
 
-    const maxVolume = Math.max(1, ...Object.values(summary.muscleLoad))
-    const intensity: Partial<Record<MuscleId, number>> = {}
-    for (const [m, vol] of Object.entries(summary.muscleLoad)) {
-      intensity[m as MuscleId] = Math.min(1, (vol ?? 0) / maxVolume)
-    }
-
-    return { heat, intensity }
+    return heat
   }, [summary])
 
   if (!summary) {
@@ -142,7 +136,7 @@ export default function SummaryScreen() {
           Mapa muscular
         </h2>
         <div className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-          <MuscleMap heat={heat} intensity={intensity} />
+          <MuscleMap heat={heat} />
           <div className="mt-4 flex items-center justify-center gap-4 text-xs text-(--color-text-muted)">
             <span className="flex items-center gap-1.5">
               <span className="h-3 w-3 rounded-full" style={{ background: 'rgba(255,45,48,0.9)' }} />
