@@ -1,25 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Cast,
-  CheckCircle2,
-  ChevronRight,
-  Maximize2,
-  Minimize2,
-  TrendingDown,
-  TrendingUp,
-  Trophy,
-  X,
-} from 'lucide-react'
+import { Cast, Flag, Maximize2, Minimize2, TrendingDown, TrendingUp, Trophy, X } from 'lucide-react'
 import { useWorkout } from '../lib/workout-context'
 import { getLastPerformance, suggestNextLoad } from '../lib/progression'
-import { logSet } from '../lib/session'
 import { isUnilateralExercise } from '../lib/unilateral'
+import { normalizeEquipment } from '../lib/equipment'
+import { SPLIT_LABELS_PT } from '../lib/routine'
 import ExerciseMedia from '../components/ExerciseMedia'
+import ExerciseStrip from '../components/ExerciseStrip'
+import SetTable from '../components/SetTable'
 import RestTimer from '../components/RestTimer'
 import CastModal from '../components/CastModal'
-import WheelPicker from '../components/WheelPicker'
-import type { LastPerformance, ProgressionSuggestion, SetEntry } from '../types/workout'
+import type { LastPerformance, ProgressionSuggestion, WorkoutSplit } from '../types/workout'
 import { MUSCLE_LABELS_PT } from '../types/muscle'
 
 export default function PlayerScreen() {
@@ -29,10 +21,14 @@ export default function PlayerScreen() {
     routineItems,
     currentItem,
     currentIndex,
-    isLastExercise,
     isTvMode,
+    sessionSets,
+    restTimer,
+    allExercisesComplete,
     setTvMode,
-    goToNextExercise,
+    goToExercise,
+    logSet,
+    updateSet,
     finishWorkout,
   } = useWorkout()
 
@@ -42,14 +38,9 @@ export default function PlayerScreen() {
   const [last, setLast] = useState<LastPerformance | null>(null)
   const [suggestion, setSuggestion] = useState<ProgressionSuggestion | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(true)
-  const [loggedSets, setLoggedSets] = useState<SetEntry[]>([])
   const [weight, setWeight] = useState(0)
   const [reps, setReps] = useState(10)
   const [rpe, setRpe] = useState(8)
-  // Incrementado a cada série registrada — vira a `key` do RestTimer, então
-  // React descarta a instância anterior (cancelando seu countdown) e monta
-  // uma nova já do zero, sem precisar sincronizar isso manualmente.
-  const [restKey, setRestKey] = useState(0)
   const [lastPR, setLastPR] = useState(false)
   const [castOpen, setCastOpen] = useState(false)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
@@ -85,7 +76,7 @@ export default function PlayerScreen() {
     if (!currentExercise || !prescription) return
     let cancelled = false
     setLoadingHistory(true)
-    setLoggedSets([])
+    setLastPR(false)
     setUnilateral(isUnilateralExercise(currentExercise))
     getLastPerformance(currentExercise.id).then((lp) => {
       if (cancelled) return
@@ -119,38 +110,36 @@ export default function PlayerScreen() {
 
   if (!currentExercise || !prescription || !session) return null
 
+  const loggedSets = sessionSets[currentExercise.id] ?? []
+  const showWeight = normalizeEquipment(currentExercise.equipment) !== 'body only'
+  const splitLabel = SPLIT_LABELS_PT[session.split as WorkoutSplit] ?? session.split
+
   async function handleLogSet() {
     if (!currentExercise) return
-    const result = await logSet({
-      sessionId: session!.id,
-      exerciseId: currentExercise.id,
-      setNumber: loggedSets.length + 1,
+    const result = await logSet(currentExercise.id, {
       weightKg: weight,
       reps,
       rpe,
       sides: unilateral ? 2 : 1,
     })
-    setLoggedSets((prev) => [...prev, result.set])
     setLastPR(result.isNewPR)
-    setRestKey((k) => k + 1)
   }
 
-  async function handleAdvance() {
-    if (isLastExercise) {
-      const sessionId = await finishWorkout()
-      if (sessionId) navigate(`/desaquecimento/${sessionId}`)
-    } else {
-      goToNextExercise()
-    }
+  function handleUpdateSet(setId: string, data: { weightKg: number; reps: number; rpe: number; sides: number }) {
+    if (!currentExercise) return
+    updateSet(currentExercise.id, setId, data)
   }
 
-  const goalMet = loggedSets.length >= prescription.sets
+  async function handleFinishWorkout() {
+    const sessionId = await finishWorkout()
+    if (sessionId) navigate(`/desaquecimento/${sessionId}`)
+  }
 
   return (
     <div
       className={`mx-auto flex min-h-svh max-w-2xl flex-col ${isTvMode ? 'text-[1.25em]' : ''}`}
     >
-      <header className="flex items-center justify-between gap-2 border-b border-(--color-border) p-4">
+      <header className="flex items-center justify-between gap-2 p-4 pb-2">
         <button
           onClick={() => setShowExitConfirm(true)}
           aria-label="Sair do treino"
@@ -158,9 +147,7 @@ export default function PlayerScreen() {
         >
           <X size={20} />
         </button>
-        <p className="text-sm font-semibold text-(--color-text-muted)">
-          Exercício {currentIndex + 1} de {routineItems.length}
-        </p>
+        <p className="text-sm font-bold text-(--color-primary)">{splitLabel}</p>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setCastOpen(true)}
@@ -179,9 +166,18 @@ export default function PlayerScreen() {
         </div>
       </header>
 
-      <ExerciseMedia exercise={currentExercise} className="h-64 w-full sm:h-80" />
+      <ExerciseStrip
+        routineItems={routineItems}
+        currentIndex={currentIndex}
+        sessionSets={sessionSets}
+        onSelect={goToExercise}
+      />
 
-      <div className="flex-1 px-5 pb-40 pt-5">
+      <div className="border-t border-(--color-border)">
+        <ExerciseMedia exercise={currentExercise} className="h-64 w-full sm:h-80" />
+      </div>
+
+      <div className="flex-1 px-5 pb-32 pt-5">
         <h1 className="text-2xl font-bold leading-tight">{currentExercise.name}</h1>
         <div className="mt-2 flex flex-wrap gap-1.5">
           <span className="rounded-full bg-(--color-primary-dim) px-2.5 py-1 text-xs font-medium">
@@ -197,14 +193,9 @@ export default function PlayerScreen() {
           ))}
         </div>
 
-        <p className="mt-3 flex items-center gap-2 text-sm font-medium text-(--color-text-muted)">
+        <p className="mt-3 text-sm font-medium text-(--color-text-muted)">
           Meta: {prescription.sets}x{prescription.repRangeMin}-{prescription.repRangeMax} ·
           descanso {prescription.restSeconds}s
-          {goalMet && (
-            <span className="flex items-center gap-1 text-(--color-success)">
-              <CheckCircle2 size={16} /> meta batida
-            </span>
-          )}
         </p>
 
         <label className="mt-2 flex w-fit items-center gap-2 text-sm text-(--color-text-muted)">
@@ -247,89 +238,42 @@ export default function PlayerScreen() {
           )}
         </section>
 
-        {loggedSets.length > 0 && (
-          <ul className="mt-4 flex flex-col gap-1.5">
-            {loggedSets.map((s) => (
-              <li
-                key={s.id}
-                className="flex items-center justify-between rounded-lg bg-(--color-surface-raised) px-3 py-2 text-sm"
-              >
-                <span>
-                  Série {s.setNumber} de {prescription.sets}
-                </span>
-                <span className="font-medium">
-                  {s.weightKg}kg × {s.reps} reps{s.sides > 1 ? ` × ${s.sides} lados` : ''} (RPE{' '}
-                  {s.rpe})
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-
         {lastPR && (
           <p className="mt-4 flex items-center gap-2 rounded-lg bg-(--color-secondary)/20 px-3 py-2 text-sm font-semibold text-(--color-secondary)">
             <Trophy size={18} /> Novo recorde pessoal!
           </p>
         )}
 
-        <section className="mt-5 grid grid-cols-3 gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-(--color-text-muted)">Peso (kg)</span>
-            <WheelPicker
-              ariaLabel="Peso em quilos"
-              value={weight}
-              onChange={setWeight}
-              min={0}
-              max={300}
-              step={0.5}
-              formatValue={(v) => v.toFixed(1)}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-(--color-text-muted)">
-              {unilateral ? 'Reps (por lado)' : 'Reps'}
-            </span>
-            <WheelPicker ariaLabel="Repetições" value={reps} onChange={setReps} min={0} max={50} step={1} />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-(--color-text-muted)">RPE (1-10)</span>
-            <WheelPicker ariaLabel="RPE" value={rpe} onChange={setRpe} min={1} max={10} step={1} />
-          </label>
-        </section>
-      </div>
-
-      {loggedSets.length > 0 && (
-        <RestTimer key={restKey} seconds={prescription.restSeconds} />
-      )}
-
-      <div className="fixed inset-x-0 bottom-0 mx-auto flex max-w-2xl flex-col gap-2 border-t border-(--color-border) bg-(--color-bg) p-4">
-        <div className="flex gap-3">
-          {!goalMet ? (
-            <button
-              onClick={handleLogSet}
-              className="flex-1 rounded-xl bg-(--color-primary) py-4 text-center text-lg font-bold text-white"
-            >
-              Registrar série ({loggedSets.length + 1} de {prescription.sets})
-            </button>
-          ) : (
-            <button
-              onClick={handleAdvance}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-(--color-success) py-4 text-center text-lg font-bold text-white"
-            >
-              {isLastExercise ? 'Finalizar treino' : 'Próximo exercício'}
-              <ChevronRight size={20} />
-            </button>
-          )}
+        <div className="mt-5">
+          <SetTable
+            sets={loggedSets}
+            totalSets={prescription.sets}
+            showWeight={showWeight}
+            unilateral={unilateral}
+            nextWeight={weight}
+            nextReps={reps}
+            nextRpe={rpe}
+            onNextWeightChange={setWeight}
+            onNextRepsChange={setReps}
+            onNextRpeChange={setRpe}
+            onLogNext={handleLogSet}
+            onUpdateSet={handleUpdateSet}
+          />
         </div>
-        {loggedSets.length > 0 && !goalMet && (
-          <button
-            onClick={handleAdvance}
-            className="text-center text-sm text-(--color-text-muted) underline"
-          >
-            {isLastExercise ? 'Pular direto para o resumo' : 'Pular para o próximo exercício'}
-          </button>
-        )}
       </div>
+
+      {restTimer && !allExercisesComplete && <RestTimer key={restTimer.key} seconds={restTimer.seconds} />}
+
+      {allExercisesComplete && (
+        <div className="fixed inset-x-0 bottom-0 mx-auto max-w-2xl border-t border-(--color-border) bg-(--color-bg) p-4">
+          <button
+            onClick={handleFinishWorkout}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-(--color-success) py-4 text-center text-lg font-bold text-white"
+          >
+            <Flag size={20} /> Concluir treino
+          </button>
+        </div>
+      )}
 
       {castOpen && <CastModal onClose={() => setCastOpen(false)} />}
 

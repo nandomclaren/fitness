@@ -56,6 +56,25 @@ sessionsRouter.post('/sessions/:id/finish', async (req, res) => {
   res.json(session)
 })
 
+/** Atualiza o recorde pessoal do exercício se essa marca (peso/reps -> e1RM) superar a atual. */
+async function maybeUpdatePR(
+  exerciseId: string,
+  weightKg: number,
+  reps: number,
+  sessionId: string,
+  achievedAt: Date,
+): Promise<boolean> {
+  const e1rm = estimateOneRepMax(weightKg, reps)
+  const existingPR = await prisma.personalRecord.findUnique({ where: { exerciseId } })
+  if (existingPR && e1rm <= existingPR.bestEstOneRepMax) return false
+  await prisma.personalRecord.upsert({
+    where: { exerciseId },
+    create: { exerciseId, bestEstOneRepMax: e1rm, bestWeightKg: weightKg, bestReps: reps, achievedAt, sessionId },
+    update: { bestEstOneRepMax: e1rm, bestWeightKg: weightKg, bestReps: reps, achievedAt, sessionId },
+  })
+  return true
+}
+
 sessionsRouter.post('/sessions/:id/sets', async (req, res) => {
   const sessionId = req.params.id
   const { exerciseId, setNumber, weightKg, reps, rpe, sides } = req.body as {
@@ -71,30 +90,29 @@ sessionsRouter.post('/sessions/:id/sets', async (req, res) => {
     data: { sessionId, exerciseId, setNumber, weightKg, reps, rpe, sides: sides ?? 1 },
   })
 
-  const e1rm = estimateOneRepMax(weightKg, reps)
-  const existingPR = await prisma.personalRecord.findUnique({ where: { exerciseId } })
-  let isNewPR = false
-  if (!existingPR || e1rm > existingPR.bestEstOneRepMax) {
-    isNewPR = true
-    await prisma.personalRecord.upsert({
-      where: { exerciseId },
-      create: {
-        exerciseId,
-        bestEstOneRepMax: e1rm,
-        bestWeightKg: weightKg,
-        bestReps: reps,
-        achievedAt: set.completedAt,
-        sessionId,
-      },
-      update: {
-        bestEstOneRepMax: e1rm,
-        bestWeightKg: weightKg,
-        bestReps: reps,
-        achievedAt: set.completedAt,
-        sessionId,
-      },
-    })
+  const isNewPR = await maybeUpdatePR(exerciseId, weightKg, reps, sessionId, set.completedAt)
+
+  res.json({ set, isNewPR })
+})
+
+// Correção de uma série já registrada (ex.: digitou peso errado sem querer). Não mexe em
+// setNumber/exerciseId — só nos valores medidos. Um recorde editado pra baixo não é
+// "desfeito" automaticamente (caso raro, fora de escopo).
+sessionsRouter.patch('/sessions/:id/sets/:setId', async (req, res) => {
+  const { setId } = req.params
+  const { weightKg, reps, rpe, sides } = req.body as {
+    weightKg: number
+    reps: number
+    rpe: number
+    sides?: number
   }
+
+  const set = await prisma.setEntry.update({
+    where: { id: setId },
+    data: { weightKg, reps, rpe, sides: sides ?? 1 },
+  })
+
+  const isNewPR = await maybeUpdatePR(set.exerciseId, weightKg, reps, set.sessionId, set.completedAt)
 
   res.json({ set, isNewPR })
 })

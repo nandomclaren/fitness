@@ -31,6 +31,21 @@ export async function logSet(input: LogSetInput): Promise<LogSetResult> {
   return api.post<LogSetResult>(`/sessions/${sessionId}/sets`, body)
 }
 
+export interface UpdateSetInput {
+  weightKg: number
+  reps: number
+  rpe: number
+  sides: number
+}
+
+export async function updateSet(
+  sessionId: string,
+  setId: string,
+  input: UpdateSetInput,
+): Promise<LogSetResult> {
+  return api.patch<LogSetResult>(`/sessions/${sessionId}/sets/${setId}`, input)
+}
+
 export async function finishSession(sessionId: string): Promise<void> {
   await api.post(`/sessions/${sessionId}/finish`)
 }
