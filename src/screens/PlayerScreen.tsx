@@ -46,7 +46,10 @@ export default function PlayerScreen() {
   const [weight, setWeight] = useState(0)
   const [reps, setReps] = useState(10)
   const [rpe, setRpe] = useState(8)
-  const [showRest, setShowRest] = useState(false)
+  // Incrementado a cada série registrada — vira a `key` do RestTimer, então
+  // React descarta a instância anterior (cancelando seu countdown) e monta
+  // uma nova já do zero, sem precisar sincronizar isso manualmente.
+  const [restKey, setRestKey] = useState(0)
   const [lastPR, setLastPR] = useState(false)
   const [castOpen, setCastOpen] = useState(false)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
@@ -83,7 +86,6 @@ export default function PlayerScreen() {
     let cancelled = false
     setLoadingHistory(true)
     setLoggedSets([])
-    setShowRest(false)
     setUnilateral(isUnilateralExercise(currentExercise))
     getLastPerformance(currentExercise.id).then((lp) => {
       if (cancelled) return
@@ -130,7 +132,7 @@ export default function PlayerScreen() {
     })
     setLoggedSets((prev) => [...prev, result.set])
     setLastPR(result.isNewPR)
-    setShowRest(true)
+    setRestKey((k) => k + 1)
   }
 
   async function handleAdvance() {
@@ -143,16 +145,6 @@ export default function PlayerScreen() {
   }
 
   const goalMet = loggedSets.length >= prescription.sets
-
-  // Depois do descanso: se a meta de séries do exercício ainda não foi batida, volta pro
-  // formulário pra registrar a próxima série (não avança pro próximo exercício sozinho).
-  async function handleContinueAfterRest() {
-    if (goalMet) {
-      await handleAdvance()
-    } else {
-      setShowRest(false)
-    }
-  }
 
   return (
     <div
@@ -274,48 +266,45 @@ export default function PlayerScreen() {
           </ul>
         )}
 
-        {showRest && (
-          <div className="mt-4 flex flex-col gap-3">
-            {lastPR && (
-              <p className="flex items-center gap-2 rounded-lg bg-(--color-secondary)/20 px-3 py-2 text-sm font-semibold text-(--color-secondary)">
-                <Trophy size={18} /> Novo recorde pessoal!
-              </p>
-            )}
-            <RestTimer seconds={prescription.restSeconds} />
-          </div>
+        {lastPR && (
+          <p className="mt-4 flex items-center gap-2 rounded-lg bg-(--color-secondary)/20 px-3 py-2 text-sm font-semibold text-(--color-secondary)">
+            <Trophy size={18} /> Novo recorde pessoal!
+          </p>
         )}
 
-        {!showRest && (
-          <section className="mt-5 grid grid-cols-3 gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-(--color-text-muted)">Peso (kg)</span>
-              <WheelPicker
-                ariaLabel="Peso em quilos"
-                value={weight}
-                onChange={setWeight}
-                min={0}
-                max={300}
-                step={0.5}
-                formatValue={(v) => v.toFixed(1)}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-(--color-text-muted)">
-                {unilateral ? 'Reps (por lado)' : 'Reps'}
-              </span>
-              <WheelPicker ariaLabel="Repetições" value={reps} onChange={setReps} min={0} max={50} step={1} />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-(--color-text-muted)">RPE (1-10)</span>
-              <WheelPicker ariaLabel="RPE" value={rpe} onChange={setRpe} min={1} max={10} step={1} />
-            </label>
-          </section>
-        )}
+        <section className="mt-5 grid grid-cols-3 gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-(--color-text-muted)">Peso (kg)</span>
+            <WheelPicker
+              ariaLabel="Peso em quilos"
+              value={weight}
+              onChange={setWeight}
+              min={0}
+              max={300}
+              step={0.5}
+              formatValue={(v) => v.toFixed(1)}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-(--color-text-muted)">
+              {unilateral ? 'Reps (por lado)' : 'Reps'}
+            </span>
+            <WheelPicker ariaLabel="Repetições" value={reps} onChange={setReps} min={0} max={50} step={1} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-(--color-text-muted)">RPE (1-10)</span>
+            <WheelPicker ariaLabel="RPE" value={rpe} onChange={setRpe} min={1} max={10} step={1} />
+          </label>
+        </section>
       </div>
+
+      {loggedSets.length > 0 && (
+        <RestTimer key={restKey} seconds={prescription.restSeconds} />
+      )}
 
       <div className="fixed inset-x-0 bottom-0 mx-auto flex max-w-2xl flex-col gap-2 border-t border-(--color-border) bg-(--color-bg) p-4">
         <div className="flex gap-3">
-          {!showRest ? (
+          {!goalMet ? (
             <button
               onClick={handleLogSet}
               className="flex-1 rounded-xl bg-(--color-primary) py-4 text-center text-lg font-bold text-white"
@@ -324,19 +313,15 @@ export default function PlayerScreen() {
             </button>
           ) : (
             <button
-              onClick={handleContinueAfterRest}
+              onClick={handleAdvance}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-(--color-success) py-4 text-center text-lg font-bold text-white"
             >
-              {goalMet
-                ? isLastExercise
-                  ? 'Finalizar treino'
-                  : 'Próximo exercício'
-                : `Próxima série (${loggedSets.length + 1} de ${prescription.sets})`}{' '}
+              {isLastExercise ? 'Finalizar treino' : 'Próximo exercício'}
               <ChevronRight size={20} />
             </button>
           )}
         </div>
-        {showRest && !goalMet && (
+        {loggedSets.length > 0 && !goalMet && (
           <button
             onClick={handleAdvance}
             className="text-center text-sm text-(--color-text-muted) underline"

@@ -1,4 +1,5 @@
-import { Pause, Play, RotateCcw } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Pause, Play, RotateCcw, Timer } from 'lucide-react'
 import { useCountdown } from '../hooks/useCountdown.ts'
 
 interface RestTimerProps {
@@ -6,53 +7,74 @@ interface RestTimerProps {
   onFinish?: () => void
 }
 
+/**
+ * Pill flutuante e não-bloqueante: fica sobre o resto da tela sem esconder os
+ * campos de peso/reps/RPE. Cada instância é descartada (remontada com uma
+ * nova `key` pelo PlayerScreen) sempre que o usuário registra a próxima série
+ * ou avança de exercício — não há necessidade de sincronizar cancelamento
+ * manualmente com o ciclo de vida do componente.
+ */
 export default function RestTimer({ seconds, onFinish }: RestTimerProps) {
   const { remaining, running, toggle, reset } = useCountdown(seconds, onFinish)
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
 
-  const mm = String(Math.floor(Math.max(0, remaining) / 60)).padStart(2, '0')
-  const ss = String(Math.max(0, remaining) % 60).padStart(2, '0')
-  const pct = Math.max(0, Math.min(1, remaining / seconds))
+  // Fecha ao tocar fora, sem interceptar o toque — assim um toque em "Registrar
+  // série" (ou qualquer outro botão da tela) fecha o popover E executa sua própria
+  // ação no mesmo gesto, em vez de exigir dois toques.
+  useEffect(() => {
+    if (!open) return
+    function handlePointerDown(e: PointerEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [open])
+
+  const overrun = remaining < 0
+  const abs = Math.abs(remaining)
+  const mm = String(Math.floor(abs / 60)).padStart(2, '0')
+  const ss = String(abs % 60).padStart(2, '0')
 
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-      <div className="relative h-16 w-16 shrink-0">
-        <svg viewBox="0 0 36 36" className="h-16 w-16 -rotate-90">
-          <circle cx="18" cy="18" r="16" fill="none" stroke="var(--color-cold)" strokeWidth="3" />
-          <circle
-            cx="18"
-            cy="18"
-            r="16"
-            fill="none"
-            stroke={remaining === 0 ? 'var(--color-success)' : 'var(--color-secondary)'}
-            strokeWidth="3"
-            strokeDasharray={2 * Math.PI * 16}
-            strokeDashoffset={2 * Math.PI * 16 * (1 - pct)}
-            strokeLinecap="round"
-          />
-        </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums">
-          {mm}:{ss}
-        </span>
-      </div>
-      <p className="flex-1 text-sm text-(--color-text-muted)">
-        {remaining === 0 ? 'Descanso concluído — hora da próxima série!' : 'Descanso entre séries'}
-      </p>
-      <div className="flex gap-2">
+    <div ref={rootRef} className="fixed inset-x-0 bottom-24 z-50 flex justify-center">
+        {open && (
+          <div className="absolute bottom-full mb-2 flex gap-1 rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-2 shadow-xl">
+            <button
+              onClick={toggle}
+              className="flex flex-col items-center gap-1 rounded-xl px-4 py-1.5"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-(--color-surface) text-(--color-text)">
+                {running ? <Pause size={16} /> : <Play size={16} />}
+              </span>
+              <span className="text-[11px] font-medium text-(--color-text-muted)">
+                {running ? 'Pausar' : 'Continuar'}
+              </span>
+            </button>
+            <button
+              onClick={reset}
+              className="flex flex-col items-center gap-1 rounded-xl px-4 py-1.5"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-(--color-surface) text-(--color-text)">
+                <RotateCcw size={16} />
+              </span>
+              <span className="text-[11px] font-medium text-(--color-text-muted)">Reiniciar</span>
+            </button>
+          </div>
+        )}
         <button
-          onClick={toggle}
-          aria-label={running ? 'Pausar' : 'Continuar'}
-          className="rounded-full bg-(--color-surface-raised) p-2.5 text-(--color-text)"
+          onClick={() => setOpen((o) => !o)}
+          aria-label="Timer de descanso — toque para pausar ou reiniciar"
+          className={`flex items-center gap-2 rounded-full px-4 py-2.5 font-extrabold text-white shadow-lg ${
+            overrun ? 'bg-(--color-primary)' : 'bg-(--color-success)'
+          }`}
         >
-          {running ? <Pause size={18} /> : <Play size={18} />}
+          <Timer size={18} />
+          <span className="text-lg tabular-nums">
+            {overrun ? '-' : ''}
+            {mm}:{ss}
+          </span>
         </button>
-        <button
-          onClick={reset}
-          aria-label="Reiniciar"
-          className="rounded-full bg-(--color-surface-raised) p-2.5 text-(--color-text)"
-        >
-          <RotateCcw size={18} />
-        </button>
-      </div>
     </div>
   )
 }
