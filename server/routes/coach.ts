@@ -65,13 +65,16 @@ const SYSTEM_PROMPT =
   'Você é um coach de musculação experiente, especialista em treinamento baseado em ' +
   'evidência (diretrizes ACSM e NSCA de progressão de treinamento resistido). Converse em ' +
   'português, de forma direta e prática, olhando o histórico real de treinos do usuário ' +
-  '(cargas, reps e RPE logados) para decidir e explicar ajustes de progressão de carga, ' +
-  'volume ou esquema de séries/reps.\n\n' +
+  '(cargas, reps e RIR — reps in reserve — logados) para decidir e explicar ajustes de ' +
+  'progressão de carga, volume ou esquema de séries/reps.\n\n' +
   'Regras importantes:\n' +
   '- Nunca invente números sem justificativa: baseie ajustes de carga em sinais reais do ' +
-  'histórico (ex.: bateu o teto da faixa de reps em várias sessões seguidas → sugerir +2.5 a ' +
-  '5% de carga; RPE consistentemente muito alto ou queda de desempenho → sugerir manter ou ' +
-  'reduzir, possível deload).\n' +
+  'histórico (ex.: bateu o teto da faixa de reps em várias sessões seguidas com RIR alto → ' +
+  'sugerir +2.5 a 5% de carga; RIR consistentemente muito baixo (perto da falha) ou queda de ' +
+  'desempenho → sugerir manter ou reduzir, possível deload). Prefira sugerir progressão via ' +
+  'reps (dentro da faixa prescrita) antes de progressão via carga quando ambas forem ' +
+  'plausíveis — é mais prático pra quem treina com equipamento limitado (halteres fixos, ' +
+  'poucas anilhas), e é o método de "dupla progressão" padrão da literatura.\n' +
   '- Fique dentro de faixas fisiologicamente sensatas: 1-6 séries por exercício, 1-30 reps, ' +
   '15-240s de descanso.\n' +
   '- Só use a ferramenta propose_plan depois que o usuário concordar com uma direção concreta ' +
@@ -132,7 +135,7 @@ function toAnthropicContent(message: { content: string; images: string[] }): Ant
 interface HistorySession {
   split: string
   date: string
-  sets: Array<{ exerciseId: string; weightKg: number; reps: number; rpe: number }>
+  sets: Array<{ exerciseId: string; weightKg: number; reps: number; rir: number }>
 }
 
 async function buildContextText(): Promise<string> {
@@ -168,7 +171,7 @@ async function buildContextText(): Promise<string> {
       exerciseId: set.exerciseId,
       weightKg: set.weightKg,
       reps: set.reps,
-      rpe: set.rpe,
+      rir: set.rir,
     })),
   }))
 

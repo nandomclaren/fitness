@@ -10,7 +10,8 @@ export interface SetEntry {
   reps: number
   /** 1 = bilateral/normal; 2 = exercício unilateral, reps feitas dos dois lados. */
   sides: number
-  rpe: number
+  /** Reps in Reserve: 0 = falha, 5 = folga bastante. Passos de 0.5. */
+  rir: number
   completedAt: string
 }
 
@@ -23,16 +24,29 @@ export interface WorkoutSession {
   finishedAt: string | null
 }
 
+export interface LastPerformanceSet {
+  setNumber: number
+  weightKg: number
+  reps: number
+  rir: number
+  sides: number
+}
+
 export interface LastPerformance {
   weightKg: number
   reps: number
   sides: number
-  rpe: number
+  rir: number
   completedAt: string
+  /** Data da sessão inteira (não só dessa série) — pra rotular o card de referência. */
+  sessionDate: string
+  /** Todas as séries daquela sessão pra esse exercício, não só a de topo. */
+  sets: LastPerformanceSet[]
 }
 
 export interface ProgressionSuggestion {
   weightKg: number
   reps: number
+  rir: number
   reason: string
 }

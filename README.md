@@ -251,12 +251,99 @@ server/routes/                # sessions (treino/séries/resumo), goals, routine
 src/data/exercises.json       # catálogo de exercícios consolidado
 src/types/                    # Exercise, WorkoutSession, UserGoals, taxonomia de músculos
 src/lib/api.ts                # cliente HTTP (fetch) do frontend para a API
-src/lib/progression.ts        # cérebro de sobrecarga progressiva
+src/lib/progression.ts        # cérebro de sobrecarga progressiva (RIR, dupla progressão)
 src/lib/session.ts            # chamadas de sessão de treino/séries/resumo
 src/lib/routine.ts            # rotina sugerida balanceada (regra fixa, fallback da IA)
+src/lib/workout-context.tsx   # estado do treino em andamento: sessão, séries, timer global
 src/components/MuscleMap.tsx  # mapa muscular SVG (heatmap)
+src/components/ExerciseStrip.tsx     # tira de miniaturas — navegação livre entre exercícios
+src/components/SetTable.tsx          # tabela de séries com check + linha de sugestão
+src/components/PreviousSessionCard.tsx # referência completa da sessão anterior
+src/components/RestTimer.tsx         # pill flutuante do descanso
 src/screens/                  # Onboarding, Goals, Home, Player, Summary
 ```
+
+---
+
+## Roadmap — trazendo ideias do Alpha Progression
+
+Em setembro/2026 o usuário revisou ~40 screenshots de um app concorrente ("Alpha
+Progression", salvos em `design-reference/` — não entram no build) e pediu pra portar as
+boas ideias de UX pro Maromba, aproximando ao máximo do visual/comportamento de lá dentro
+da nossa paleta. Esta seção existe pra sobreviver a compactações de contexto: qualquer
+sessão nova (ou o próprio usuário) deve conseguir retomar o trabalho só lendo aqui, sem
+depender de memória de conversa.
+
+### Itens combinados e status
+
+- [x] **Timer de descanso em pill flutuante** (não bloqueia a tela; popover
+  pausar/reiniciar fechando ao tocar fora sem interceptar o clique; conta negativo/estoura
+  em vez de sumir).
+- [x] **Navegação livre entre exercícios** — tira de miniaturas no topo (`ExerciseStrip`),
+  toca em qualquer exercício a qualquer momento, sem exigir que o atual esteja concluído.
+- [x] **Tabela de séries com check** (`SetTable`) — substitui wheel pickers soltos + botão
+  "Registrar série" por linhas com checkmark; série já registrada é editável (toca, corrige,
+  salva). Colunas mudam por exercício (`Kg` some em bodyweight).
+- [x] **Avanço automático** — registrar a última série de um exercício pula pro próximo
+  (por posição) sozinho; quando *todos* os exercícios da rotina batem a meta (checado por
+  dados reais, não por posição na lista), o botão "Concluir treino" (largura cheia)
+  substitui a pill.
+- [x] **RIR em vez de RPE** — 0 a 5 em passos de 0.5 (era 1-10 inteiro). Migração
+  `20260923204925_set_entry_rir` converteu os dados existentes (`rir = 10 - rpe`), não
+  descartou.
+- [x] **10RM por série** (coluna `10RM`) — fórmula de Epley (`oneRepMax.ts`,
+  `estimateNRepMax`) normalizada pra 10 reps, comparável entre sessões mesmo quando as reps
+  reais variam.
+- [x] **Linha de sugestão de progressão** — dupla progressão (double progression: sobe reps
+  dentro da faixa prescrita antes de subir peso), separada da linha padrão (que repete a
+  última sessão), com motivo em texto e toque em "USAR" pra aplicar. Ver decisão sobre
+  preferência por reps abaixo.
+- [x] **Referência completa da sessão anterior** (`PreviousSessionCard`) — todas as séries
+  da última vez, não só a de topo, mesmas colunas da tabela ativa.
+- [ ] **Streaks/gamificação** (dias seguidos, contagem de treinos) — não iniciado.
+- [ ] **Plano multi-semana** (modelo `Plan` com semanas/dias, wizard de criação, calendário
+  semanal na Home) — maior item pendente, tratar como projeto isolado (schema novo).
+- [ ] **Biblioteca de exercícios com vídeo/instruções passo-a-passo** — hoje só temos
+  imagem estática (`ExerciseMedia`); Alpha tem vídeo em loop + texto de setup/execução.
+- [ ] **Notificação OS-level "descanso concluído"** — gap real, nunca implementado. Ver
+  decisão sobre Live Activity/AOD abaixo (bloqueado por infra nativa).
+- [ ] **Gestão de equipamento ("My gym") como tela dedicada** — hoje só existe dentro do
+  onboarding; Alpha permite editar a qualquer momento.
+
+### Decisões de arquitetura registradas ao longo do caminho
+
+- **O timer de descanso é do treino, não da tela do exercício.** Vive em
+  `workout-context` (`restTimer: {seconds, key} | null`), não em estado local do
+  `PlayerScreen`. Só **registrar uma série nova** cancela/reinicia (via remount por
+  `key`); navegar entre exercícios pela tira nunca mexe nele — resolve um bug real do
+  Alpha Progression (lá, a notificação de "descanso concluído" dispara errado porque o
+  app só percebe que você mudou de série *depois do fato*, via checkbox). Isso também
+  significa que o pill continua contando mesmo se você sair da tela do exercício que o
+  disparou.
+- **Progresso por exercício também é da sessão, não da tela.** `sessionSets` no
+  `workout-context` (map `exerciseId -> SetEntry[]`) sobrevive à navegação — voltar pra um
+  exercício já visitado mostra as séries certas, e a tira sabe quais exercícios já bateram
+  a meta sem re-fetch.
+- **RIR em vez de RPE**: as duas escalas medem a mesma coisa (a RPE de treino de força já é
+  ancorada em reps-in-reserve), então a troca não é por "mais ciência" — é porque RIR é
+  mais concreto pro usuário e é o que a referência usa.
+- **Sugestão prefere reps a peso quando possível (dupla progressão)** — pedido explícito do
+  usuário: ele treina em academia caseira, onde trocar peso (halteres fixos, poucas
+  anilhas) dá mais trabalho que fazer mais 1-2 reps. `suggestNextLoad` só sobe peso quando
+  a faixa de reps prescrita já foi batida no teto; confirmado que é método padrão da
+  literatura ("double progression"), não uma simplificação.
+- **Live Activity / Always-On-Display real não é alcançável só com PWA.** Investigado a
+  pedido do usuário: tanto iOS (ActivityKit/WidgetKit) quanto o "Live Updates" do Android
+  exigem código nativo (foreground service + notificação com progress bar — a Web
+  Notifications API não tem isso). Caminho viável, se/quando o app for empacotado nativo
+  (decisão já tomada antes: empacotar, não reescrever): plugin nativo pequeno (~150 linhas
+  Kotlin) só pra essa notificação, resto continua sendo a mesma base web. Até lá, o gap
+  fica só em "notificação pontual quando o descanso acaba" (nem isso foi implementado
+  ainda).
+- **Correção de série já registrada precisa de round-trip ao backend** —
+  `PATCH /sessions/:id/sets/:setId` (`server/routes/sessions.ts`), reaproveitando a mesma
+  lógica de recálculo de recorde pessoal do POST (extraída pra `maybeUpdatePR`). Editar um
+  recorde pra baixo não "desfaz" o PR automaticamente (caso raro, fora de escopo).
 
 ---
 

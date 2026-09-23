@@ -32,7 +32,8 @@ model SetEntry {
   reps        Int
   /// 1 = bilateral/normal; 2 = exercício unilateral, reps feitas dos dois lados.
   sides       Int            @default(1)
-  rpe         Int
+  /// Reps in Reserve: 0 = falha, 5 = folga bastante. Passos de 0.5.
+  rir         Float
   completedAt DateTime       @default(now())
 
   @@index([exerciseId])

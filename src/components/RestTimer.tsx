@@ -9,7 +9,7 @@ interface RestTimerProps {
 
 /**
  * Pill flutuante e não-bloqueante: fica sobre o resto da tela sem esconder os
- * campos de peso/reps/RPE. Cada instância é descartada (remontada com uma
+ * campos de peso/reps/RIR. Cada instância é descartada (remontada com uma
  * nova `key` pelo PlayerScreen) sempre que o usuário registra a próxima série
  * ou avança de exercício — não há necessidade de sincronizar cancelamento
  * manualmente com o ciclo de vida do componente.

@@ -27,7 +27,7 @@ interface RestTimerState {
 interface LogSetData {
   weightKg: number
   reps: number
-  rpe: number
+  rir: number
   sides: number
 }
 
@@ -56,7 +56,7 @@ interface WorkoutContextValue {
    * série completa a meta do exercício e ainda sobra outro pendente, avança automaticamente
    * pra tela do próximo (por posição) — o timer continua contando independente da tela. */
   logSet: (exerciseId: string, data: LogSetData) => Promise<{ isNewPR: boolean }>
-  /** Corrige uma série já registrada (peso/reps/RPE). Não mexe no timer nem navega. */
+  /** Corrige uma série já registrada (peso/reps/RIR). Não mexe no timer nem navega. */
   updateSet: (exerciseId: string, setId: string, data: LogSetData) => Promise<{ isNewPR: boolean }>
   finishWorkout: () => Promise<string | null>
 }

@@ -77,17 +77,17 @@ async function maybeUpdatePR(
 
 sessionsRouter.post('/sessions/:id/sets', async (req, res) => {
   const sessionId = req.params.id
-  const { exerciseId, setNumber, weightKg, reps, rpe, sides } = req.body as {
+  const { exerciseId, setNumber, weightKg, reps, rir, sides } = req.body as {
     exerciseId: string
     setNumber: number
     weightKg: number
     reps: number
-    rpe: number
+    rir: number
     sides?: number
   }
 
   const set = await prisma.setEntry.create({
-    data: { sessionId, exerciseId, setNumber, weightKg, reps, rpe, sides: sides ?? 1 },
+    data: { sessionId, exerciseId, setNumber, weightKg, reps, rir, sides: sides ?? 1 },
   })
 
   const isNewPR = await maybeUpdatePR(exerciseId, weightKg, reps, sessionId, set.completedAt)
@@ -100,16 +100,16 @@ sessionsRouter.post('/sessions/:id/sets', async (req, res) => {
 // "desfeito" automaticamente (caso raro, fora de escopo).
 sessionsRouter.patch('/sessions/:id/sets/:setId', async (req, res) => {
   const { setId } = req.params
-  const { weightKg, reps, rpe, sides } = req.body as {
+  const { weightKg, reps, rir, sides } = req.body as {
     weightKg: number
     reps: number
-    rpe: number
+    rir: number
     sides?: number
   }
 
   const set = await prisma.setEntry.update({
     where: { id: setId },
-    data: { weightKg, reps, rpe, sides: sides ?? 1 },
+    data: { weightKg, reps, rir, sides: sides ?? 1 },
   })
 
   const isNewPR = await maybeUpdatePR(set.exerciseId, weightKg, reps, set.sessionId, set.completedAt)
@@ -128,16 +128,31 @@ sessionsRouter.get('/exercises/:exerciseId/last-performance', async (req, res) =
     return
   }
   const lastSessionId = sets[sets.length - 1].sessionId
-  const lastSessionSets = sets.filter((s) => s.sessionId === lastSessionId)
+  const lastSessionSets = sets
+    .filter((s) => s.sessionId === lastSessionId)
+    .sort((a, b) => a.setNumber - b.setNumber)
   const topSet = lastSessionSets.reduce((best, s) =>
     s.weightKg > best.weightKg || (s.weightKg === best.weightKg && s.reps > best.reps) ? s : best,
   )
+  const lastSession = await prisma.workoutSession.findUnique({ where: { id: lastSessionId } })
+
   res.json({
     weightKg: topSet.weightKg,
     reps: topSet.reps,
     sides: topSet.sides,
-    rpe: topSet.rpe,
+    rir: topSet.rir,
     completedAt: topSet.completedAt,
+    // Data da sessão inteira (não só dessa série) — usada pra rotular o card "sessão anterior".
+    sessionDate: lastSession?.startedAt ?? topSet.completedAt,
+    // Todas as séries daquela sessão pra esse exercício (não só a de topo) — mostradas como
+    // referência completa na tela do exercício, não só o comparativo de uma série.
+    sets: lastSessionSets.map((s) => ({
+      setNumber: s.setNumber,
+      weightKg: s.weightKg,
+      reps: s.reps,
+      rir: s.rir,
+      sides: s.sides,
+    })),
   })
 })
 

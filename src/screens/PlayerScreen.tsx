@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cast, Flag, Maximize2, Minimize2, TrendingDown, TrendingUp, Trophy, X } from 'lucide-react'
+import { Cast, Flag, Maximize2, Minimize2, Trophy, X } from 'lucide-react'
 import { useWorkout } from '../lib/workout-context'
 import { getLastPerformance, suggestNextLoad } from '../lib/progression'
 import { isUnilateralExercise } from '../lib/unilateral'
@@ -9,6 +9,7 @@ import { SPLIT_LABELS_PT } from '../lib/routine'
 import ExerciseMedia from '../components/ExerciseMedia'
 import ExerciseStrip from '../components/ExerciseStrip'
 import SetTable from '../components/SetTable'
+import PreviousSessionCard from '../components/PreviousSessionCard'
 import RestTimer from '../components/RestTimer'
 import CastModal from '../components/CastModal'
 import type { LastPerformance, ProgressionSuggestion, WorkoutSplit } from '../types/workout'
@@ -40,7 +41,7 @@ export default function PlayerScreen() {
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [weight, setWeight] = useState(0)
   const [reps, setReps] = useState(10)
-  const [rpe, setRpe] = useState(8)
+  const [rir, setRir] = useState(2)
   const [lastPR, setLastPR] = useState(false)
   const [castOpen, setCastOpen] = useState(false)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
@@ -82,24 +83,20 @@ export default function PlayerScreen() {
       if (cancelled) return
       setLast(lp)
       if (lp) {
-        const sug = suggestNextLoad(lp)
-        setSuggestion(sug)
-        setWeight(sug.weightKg)
-        // Encaixa a sugestão (baseada no histórico) dentro da faixa de reps prescrita
-        // atual — se o objetivo mudou desde a última vez, o histórico pode sugerir um
-        // número de reps fora da meta de hoje.
-        const clampedReps = Math.min(
-          prescription.repRangeMax,
-          Math.max(prescription.repRangeMin, sug.reps),
-        )
-        setReps(clampedReps)
+        // A linha ativa começa repetindo exatamente a última sessão — é o ponto de
+        // partida mais simples pra registrar direto. A sugestão de progressão (dupla
+        // progressão: reps antes de carga) fica como linha separada e opcional logo
+        // abaixo, pro usuário decidir se aplica.
+        setSuggestion(suggestNextLoad(lp, prescription))
+        setWeight(lp.weightKg)
+        setReps(lp.reps)
       } else {
         setSuggestion(null)
         setWeight(0)
         // Sem histórico: usa o meio da faixa de reps prescrita como ponto de partida.
         setReps(Math.round((prescription.repRangeMin + prescription.repRangeMax) / 2))
       }
-      setRpe(8)
+      setRir(2)
       setLoadingHistory(false)
     })
     return () => {
@@ -119,15 +116,21 @@ export default function PlayerScreen() {
     const result = await logSet(currentExercise.id, {
       weightKg: weight,
       reps,
-      rpe,
+      rir,
       sides: unilateral ? 2 : 1,
     })
     setLastPR(result.isNewPR)
   }
 
-  function handleUpdateSet(setId: string, data: { weightKg: number; reps: number; rpe: number; sides: number }) {
+  function handleUpdateSet(setId: string, data: { weightKg: number; reps: number; rir: number; sides: number }) {
     if (!currentExercise) return
     updateSet(currentExercise.id, setId, data)
+  }
+
+  function handleApplySuggestion(s: ProgressionSuggestion) {
+    setWeight(s.weightKg)
+    setReps(s.reps)
+    setRir(s.rir)
   }
 
   async function handleFinishWorkout() {
@@ -208,35 +211,14 @@ export default function PlayerScreen() {
           Um lado de cada vez (registra as reps de cada lado, dobra o volume)
         </label>
 
-        <section className="mt-4 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-          {loadingHistory ? (
-            <p className="text-sm text-(--color-text-muted)">Carregando histórico...</p>
-          ) : last ? (
-            <>
-              <p className="text-sm text-(--color-text-muted)">
-                Última sessão:{' '}
-                <strong className="text-(--color-text)">
-                  {last.weightKg}kg × {last.reps} reps{last.sides > 1 ? ` (${last.sides} lados)` : ''}
-                </strong>{' '}
-                (RPE {last.rpe})
-              </p>
-              {suggestion && (
-                <p className="mt-2 flex items-start gap-2 text-sm font-medium">
-                  {suggestion.weightKg > last.weightKg ? (
-                    <TrendingUp size={18} className="mt-0.5 shrink-0 text-(--color-success)" />
-                  ) : suggestion.weightKg < last.weightKg ? (
-                    <TrendingDown size={18} className="mt-0.5 shrink-0 text-(--color-secondary)" />
-                  ) : null}
-                  <span>{suggestion.reason}</span>
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="text-sm text-(--color-text-muted)">
-              Primeira vez treinando este exercício. Registre sua carga inicial.
-            </p>
-          )}
-        </section>
+        {loadingHistory && (
+          <p className="mt-4 text-sm text-(--color-text-muted)">Carregando histórico...</p>
+        )}
+        {!loadingHistory && !last && (
+          <p className="mt-4 rounded-xl border border-(--color-border) bg-(--color-surface) p-4 text-sm text-(--color-text-muted)">
+            Primeira vez treinando este exercício. Registre sua carga inicial.
+          </p>
+        )}
 
         {lastPR && (
           <p className="mt-4 flex items-center gap-2 rounded-lg bg-(--color-secondary)/20 px-3 py-2 text-sm font-semibold text-(--color-secondary)">
@@ -252,14 +234,22 @@ export default function PlayerScreen() {
             unilateral={unilateral}
             nextWeight={weight}
             nextReps={reps}
-            nextRpe={rpe}
+            nextRir={rir}
             onNextWeightChange={setWeight}
             onNextRepsChange={setReps}
-            onNextRpeChange={setRpe}
+            onNextRirChange={setRir}
             onLogNext={handleLogSet}
             onUpdateSet={handleUpdateSet}
+            suggestion={suggestion}
+            onApplySuggestion={handleApplySuggestion}
           />
         </div>
+
+        {last && (
+          <div className="mt-5">
+            <PreviousSessionCard sessionDate={last.sessionDate} sets={last.sets} showWeight={showWeight} />
+          </div>
+        )}
       </div>
 
       {restTimer && !allExercisesComplete && <RestTimer key={restTimer.key} seconds={restTimer.seconds} />}

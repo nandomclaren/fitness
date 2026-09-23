@@ -16,7 +16,7 @@ export interface LogSetInput {
   setNumber: number
   weightKg: number
   reps: number
-  rpe: number
+  rir: number
   /** 1 = normal; 2 = exercício unilateral, reps feitas dos dois lados. */
   sides: number
 }
@@ -34,7 +34,7 @@ export async function logSet(input: LogSetInput): Promise<LogSetResult> {
 export interface UpdateSetInput {
   weightKg: number
   reps: number
-  rpe: number
+  rir: number
   sides: number
 }
 
