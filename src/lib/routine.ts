@@ -7,6 +7,9 @@ import type { WorkoutSplit } from '../types/workout.ts'
 // Ordem de equipamentos preferida para exercícios-âncora (multiarticulares antes de isolados).
 const EQUIPMENT_PRIORITY = ['barbell', 'dumbbell', 'machine', 'cable', 'body only', 'other']
 
+// Todo split inclui abs + obliques — não existe mais um dia dedicado só a "Core"; cada
+// treino de força carrega algum trabalho de core junto, do jeito que a maioria dos splits
+// reais funciona na prática.
 export const SPLIT_MUSCLES: Record<WorkoutSplit, MuscleId[]> = {
   upper: [
     'chest',
@@ -17,8 +20,9 @@ export const SPLIT_MUSCLES: Record<WorkoutSplit, MuscleId[]> = {
     'triceps',
     'rear_delts',
     'abs',
+    'obliques',
   ],
-  lower: ['quads', 'hamstrings', 'glutes', 'calves', 'adductors', 'abs'],
+  lower: ['quads', 'hamstrings', 'glutes', 'calves', 'adductors', 'abs', 'obliques'],
   full: [
     'chest',
     'lats',
@@ -29,10 +33,8 @@ export const SPLIT_MUSCLES: Record<WorkoutSplit, MuscleId[]> = {
     'biceps',
     'triceps',
     'abs',
+    'obliques',
   ],
-  // Estilo "Core" (ex.: Apple Fitness+): abdômen, prancha, lombar e cadeia posterior —
-  // pensado pra rodar sem equipamento nenhum ou só com halteres/faixas elásticas.
-  core: ['abs', 'obliques', 'lower_back', 'hamstrings', 'glutes'],
 }
 
 function bestExerciseFor(
@@ -79,5 +81,4 @@ export const SPLIT_LABELS_PT: Record<WorkoutSplit, string> = {
   upper: 'Superior',
   lower: 'Inferior',
   full: 'Completo',
-  core: 'Core',
 }

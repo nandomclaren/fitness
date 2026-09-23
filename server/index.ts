@@ -7,6 +7,7 @@ import { sessionsRouter } from './routes/sessions.ts'
 import { goalsRouter } from './routes/goals.ts'
 import { routineRouter } from './routes/routine.ts'
 import { coachRouter } from './routes/coach.ts'
+import { plansRouter } from './routes/plans.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const distDir = path.resolve(__dirname, '..', 'dist')
@@ -23,6 +24,7 @@ app.use('/api', requireAccessToken, sessionsRouter)
 app.use('/api', requireAccessToken, goalsRouter)
 app.use('/api', requireAccessToken, routineRouter)
 app.use('/api', requireAccessToken, coachRouter)
+app.use('/api', requireAccessToken, plansRouter)
 
 // Em produção, o mesmo servidor serve o build estático do frontend (SPA).
 app.use(express.static(distDir))

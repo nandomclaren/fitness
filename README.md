@@ -260,6 +260,11 @@ src/components/ExerciseStrip.tsx     # tira de miniaturas — navegação livre 
 src/components/SetTable.tsx          # tabela de séries com check + linha de sugestão
 src/components/PreviousSessionCard.tsx # referência completa da sessão anterior
 src/components/RestTimer.tsx         # pill flutuante do descanso
+src/components/WeekStrip.tsx         # tira Dom-Sáb decorativa (marca "hoje") na Home
+src/lib/plans.ts              # cliente da API de planos (listar/criar/ativar/arquivar)
+server/routes/plans.ts        # CRUD de planos: gerador IA ou regra fixa, activate/archive
+src/screens/PlanWizardScreen.tsx # wizard de criação de plano (gerador vs. vazio → config → revisão)
+src/screens/AllPlansScreen.tsx   # "Meus planos" — arquivar/reativar
 src/screens/                  # Onboarding, Goals, Home, Player, Summary
 ```
 
@@ -300,9 +305,14 @@ depender de memória de conversa.
   preferência por reps abaixo.
 - [x] **Referência completa da sessão anterior** (`PreviousSessionCard`) — todas as séries
   da última vez, não só a de topo, mesmas colunas da tabela ativa.
+- [x] **Plano multi-semana** — wizard de criação (`PlanWizardScreen`: escolha
+  gerador IA vs. regra fixa → nº de rotinas + duração + toggles opcionais → revisão), tira
+  semanal + "Semana X de Y" na Home, tela "Meus planos" (`AllPlansScreen`) com
+  arquivar/reativar (só um plano ativo por vez, nunca perde os outros). Reaproveitou toda a
+  infra que já existia (`WorkoutPlan`/`PlanRoutine`/`PlanExercise`, `/plan/active`) — só
+  faltava o jeito de criar plano fora do chat do coach e a gestão de vários planos. Ver
+  decisões sobre deload/periodização e consolidação de split abaixo.
 - [ ] **Streaks/gamificação** (dias seguidos, contagem de treinos) — não iniciado.
-- [ ] **Plano multi-semana** (modelo `Plan` com semanas/dias, wizard de criação, calendário
-  semanal na Home) — maior item pendente, tratar como projeto isolado (schema novo).
 - [ ] **Biblioteca de exercícios com vídeo/instruções passo-a-passo** — hoje só temos
   imagem estática (`ExerciseMedia`); Alpha tem vídeo em loop + texto de setup/execução.
 - [ ] **Notificação OS-level "descanso concluído"** — gap real, nunca implementado. Ver
@@ -340,6 +350,26 @@ depender de memória de conversa.
   Kotlin) só pra essa notificação, resto continua sendo a mesma base web. Até lá, o gap
   fica só em "notificação pontual quando o descanso acaba" (nem isso foi implementado
   ainda).
+- **Deload e periodização linear são calculados, não guardados por semana.** Só dois
+  booleanos no `WorkoutPlan` (`deload`, `linearPeriodization`) — nenhuma cópia de
+  `PlanExercise` por semana. `currentPlanWeek`/`applyWeekAdjustments`
+  (`src/lib/prescription.ts`) derivam a prescrição efetiva da semana atual a partir da
+  base + `activatedAt`, on-the-fly, toda vez que a Home monta os `RoutineItem[]` do plano.
+  Deload é a cada 4 semanas (menos 1 série, RIR alvo sobe pra 4 — via
+  `Prescription.deload`, que `suggestNextLoad` lê pra trocar de ramo inteiro em vez de
+  tentar progredir). Periodização desliza a faixa de reps até 3 reps entre a semana 1 e a
+  última do bloco. Os dois são opt-in na criação (pedido explícito do usuário depois de eu
+  mostrar exemplos — ele achou "tentador" mas quis controle, não automático).
+- **"Core" deixou de ser split isolado.** `WorkoutSplit` agora só tem
+  `upper | lower | full`; todo split inclui `abs` + `obliques` em `SPLIT_MUSCLES`
+  (`src/lib/routine.ts`) — todo treino de força carrega algum core junto, em vez de um dia
+  dedicado só a isso. Confirmado por Playwright: rotina "Completo" gerada inclui
+  "Barbell Ab Rollout" e "Barbell Leg Twist Press" (oblíquos) sem precisar de um split
+  Core à parte.
+- **Ativar um plano sempre arquiva o anterior, nunca deleta.** Mesma transação
+  (`updateMany status=active→archived` + o novo vira `active`) usada tanto pra criar plano
+  no wizard quanto pra reativar um arquivado (`POST /plans/:id/activate`) — status "core"
+  são só `active`/`archived`, nunca removido de verdade.
 - **Correção de série já registrada precisa de round-trip ao backend** —
   `PATCH /sessions/:id/sets/:setId` (`server/routes/sessions.ts`), reaproveitando a mesma
   lógica de recálculo de recorde pessoal do POST (extraída pra `maybeUpdatePR`). Editar um

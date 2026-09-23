@@ -8,6 +8,8 @@ import HistoryScreen from './screens/HistoryScreen'
 import WarmupScreen from './screens/WarmupScreen'
 import CooldownScreen from './screens/CooldownScreen'
 import CoachScreen from './screens/CoachScreen'
+import PlanWizardScreen from './screens/PlanWizardScreen'
+import AllPlansScreen from './screens/AllPlansScreen'
 
 export default function App() {
   return (
@@ -17,6 +19,8 @@ export default function App() {
       <Route path="/objetivos" element={<GoalsScreen />} />
       <Route path="/historico" element={<HistoryScreen />} />
       <Route path="/coach" element={<CoachScreen />} />
+      <Route path="/planos" element={<AllPlansScreen />} />
+      <Route path="/planos/novo" element={<PlanWizardScreen />} />
       <Route path="/aquecimento" element={<WarmupScreen />} />
       <Route path="/treino" element={<PlayerScreen />} />
       <Route path="/desaquecimento/:sessionId" element={<CooldownScreen />} />

@@ -1,4 +1,6 @@
-export type WorkoutSplit = 'upper' | 'lower' | 'full' | 'core'
+// "Core" deixou de ser um split isolado — todo treino de força inclui algum trabalho de
+// core (abdômen/oblíquos) dentro do split, em vez de um dia dedicado só a isso.
+export type WorkoutSplit = 'upper' | 'lower' | 'full'
 
 export interface SetEntry {
   id: string

@@ -29,6 +29,15 @@ const TARGET_RIR = 2
  *  - RIR ==2 (moderado): mantém carga e reps, consolida a técnica.
  */
 export function suggestNextLoad(last: LastPerformance, prescription: Prescription): ProgressionSuggestion {
+  if (prescription.deload) {
+    return {
+      weightKg: roundToHalfKg(last.weightKg * 0.9),
+      reps: last.reps,
+      rir: 4,
+      reason: 'Semana de deload — carga reduzida de propósito pra recuperar. Vá com folga (RIR alto).',
+    }
+  }
+
   if (last.rir <= 1) {
     return {
       weightKg: roundToHalfKg(last.weightKg * 0.95),

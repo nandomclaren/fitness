@@ -24,6 +24,10 @@ export interface WorkoutPlan {
   rationale: string
   durationWeeks: number | null
   status: WorkoutPlanStatus
+  /** Insere uma semana de deload (menos série, RIR alvo mais alto) a cada 4 semanas do plano. */
+  deload: boolean
+  /** Desliza a faixa de reps prescrita da semana 1 até a última semana do bloco. */
+  linearPeriodization: boolean
   activatedAt: string | null
   createdAt: string
   routines: PlanRoutine[]

@@ -8,13 +8,20 @@ import { getGoals } from '../lib/goals.ts'
 import { api } from '../lib/api.ts'
 import { getActivePlan } from '../lib/coach.ts'
 import { getExercise } from '../lib/exercises.ts'
-import { buildRoutineItems, estimateWorkoutMinutes, type RoutineItem } from '../lib/prescription.ts'
+import {
+  buildRoutineItems,
+  estimateWorkoutMinutes,
+  currentPlanWeek,
+  applyWeekAdjustments,
+  type RoutineItem,
+} from '../lib/prescription.ts'
 import { MUSCLE_LABELS_PT } from '../types/muscle'
 import type { UserGoals } from '../types/goals.ts'
 import type { Exercise } from '../types/exercise'
 import type { WorkoutSplit } from '../types/workout'
 import type { ActiveWorkoutPlan } from '../types/coach.ts'
 import ExercisePicker from '../components/ExercisePicker'
+import WeekStrip from '../components/WeekStrip'
 
 /**
  * Nome curto pra caber nas abas de seleção de rotina — o coach pode nomear rotinas de
@@ -27,7 +34,7 @@ function shortRoutineLabel(label: string): string {
   return short === label ? short : `Treino ${short}`
 }
 
-const SPLITS: WorkoutSplit[] = ['upper', 'lower', 'full', 'core']
+const SPLITS: WorkoutSplit[] = ['upper', 'lower', 'full']
 
 interface AiRoutineResponse {
   exerciseIds: string[]
@@ -62,24 +69,28 @@ export default function HomeScreen() {
   const estimatedMinutes = useMemo(() => estimateWorkoutMinutes(routineItems), [routineItems])
 
   const selectedRoutine = activePlan?.routines.find((r) => r.id === selectedRoutineId) ?? null
+  const currentWeek = activePlan
+    ? currentPlanWeek(activePlan.activatedAt ?? activePlan.createdAt, activePlan.durationWeeks)
+    : 1
   const planRoutineItems: RoutineItem[] = useMemo(() => {
-    if (!selectedRoutine) return []
+    if (!selectedRoutine || !activePlan) return []
     return selectedRoutine.exercises
       .map((pe) => {
         const exercise = getExercise(pe.exerciseId)
         if (!exercise) return null
         return {
           exercise,
-          prescription: {
-            sets: pe.sets,
-            repRangeMin: pe.repRangeMin,
-            repRangeMax: pe.repRangeMax,
-            restSeconds: pe.restSeconds,
-          },
+          prescription: applyWeekAdjustments(
+            { sets: pe.sets, repRangeMin: pe.repRangeMin, repRangeMax: pe.repRangeMax, restSeconds: pe.restSeconds },
+            currentWeek,
+            activePlan.durationWeeks,
+            { deload: activePlan.deload, linearPeriodization: activePlan.linearPeriodization },
+          ),
         }
       })
       .filter((item): item is RoutineItem => item !== null)
-  }, [selectedRoutine])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRoutine, activePlan, currentWeek])
   const planEstimatedMinutes = useMemo(
     () => estimateWorkoutMinutes(planRoutineItems),
     [planRoutineItems],
@@ -143,10 +154,28 @@ export default function HomeScreen() {
 
       {showPlanMode && activePlan && (
         <section>
-          <div className="mb-3 flex items-center justify-between">
+          <WeekStrip />
+
+          <div className="mb-1 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-(--color-text-muted)">
-              Plano do coach
+              {activePlan.name}
             </h2>
+            <button
+              onClick={() => navigate('/planos')}
+              className="text-xs font-semibold text-(--color-primary)"
+            >
+              Todos os planos
+            </button>
+          </div>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs text-(--color-text-muted)">
+              {activePlan.durationWeeks
+                ? `Semana ${currentWeek} de ${activePlan.durationWeeks}`
+                : 'Sem duração definida'}
+              {activePlan.deload && currentWeek % 4 === 0 && (
+                <span className="ml-1.5 font-semibold text-(--color-secondary)">· deload</span>
+              )}
+            </p>
             <button
               onClick={() => setUseAutoInstead(true)}
               className="text-xs font-medium text-(--color-text-muted) underline"
@@ -154,7 +183,6 @@ export default function HomeScreen() {
               Usar sugestão automática
             </button>
           </div>
-          <p className="mb-3 text-sm font-medium">{activePlan.name}</p>
           <div className="grid grid-cols-3 gap-2">
             {activePlan.routines.map((r) => (
               <button
@@ -208,16 +236,23 @@ export default function HomeScreen() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-(--color-text-muted)">
               Qual treino de hoje?
             </h2>
-            {activePlan && (
+            {activePlan ? (
               <button
                 onClick={() => setUseAutoInstead(false)}
                 className="text-xs font-medium text-(--color-text-muted) underline"
               >
                 Usar plano do coach
               </button>
+            ) : (
+              <button
+                onClick={() => navigate('/planos/novo')}
+                className="text-xs font-semibold text-(--color-primary)"
+              >
+                + Criar plano
+              </button>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {SPLITS.map((s) => (
               <button
                 key={s}
