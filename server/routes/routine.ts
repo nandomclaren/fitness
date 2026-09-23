@@ -8,6 +8,13 @@ import type { WorkoutSplit } from '../../src/types/workout.ts'
 
 export const routineRouter = Router()
 
+// Catálogo de exercícios (somente leitura) — usado por integrações externas (ex.: Helm)
+// que precisam resolver o nome/músculo de um exerciseId retornado por outros endpoints
+// (como /plan/active), que só expõem o ID.
+routineRouter.get('/exercises', (_req, res) => {
+  res.json(compactCatalog())
+})
+
 const client = new Anthropic()
 
 const PROPOSE_ROUTINE_TOOL: Anthropic.Tool = {
