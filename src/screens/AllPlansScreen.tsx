@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Plus } from 'lucide-react'
-import { listPlans, activatePlan } from '../lib/plans.ts'
+import { listPlans, activatePlan, archivePlan } from '../lib/plans.ts'
 import type { WorkoutPlan } from '../types/coach.ts'
 
 export default function AllPlansScreen() {
@@ -19,6 +19,16 @@ export default function AllPlansScreen() {
     setBusyId(id)
     try {
       await activatePlan(id)
+      reload()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handleArchive(id: string) {
+    setBusyId(id)
+    try {
+      await archivePlan(id)
       reload()
     } finally {
       setBusyId(null)
@@ -83,13 +93,21 @@ export default function AllPlansScreen() {
                     {plan.linearPeriodization ? ' · periodização' : ''}
                   </p>
                 </div>
-                {!isActive && (
+                {!isActive ? (
                   <button
                     onClick={() => handleActivate(plan.id)}
                     disabled={busyId === plan.id}
                     className="shrink-0 rounded-full bg-(--color-primary)/10 px-3.5 py-2 text-xs font-semibold text-(--color-primary) disabled:opacity-60"
                   >
                     {busyId === plan.id ? '...' : 'Reativar'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleArchive(plan.id)}
+                    disabled={busyId === plan.id}
+                    className="shrink-0 rounded-full bg-(--color-surface-raised) px-3.5 py-2 text-xs font-semibold text-(--color-text-muted) disabled:opacity-60"
+                  >
+                    {busyId === plan.id ? '...' : 'Arquivar'}
                   </button>
                 )}
               </div>

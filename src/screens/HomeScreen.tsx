@@ -157,12 +157,10 @@ export default function HomeScreen() {
           <WeekStrip />
 
           <div className="mb-1 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-(--color-text-muted)">
-              {activePlan.name}
-            </h2>
+            <h2 className="truncate text-base font-bold">{activePlan.name}</h2>
             <button
               onClick={() => navigate('/planos')}
-              className="text-xs font-semibold text-(--color-primary)"
+              className="shrink-0 text-xs font-semibold text-(--color-primary)"
             >
               Todos os planos
             </button>
