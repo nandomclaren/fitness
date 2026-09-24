@@ -12,6 +12,7 @@ import SetTable from '../components/SetTable'
 import PreviousSessionCard from '../components/PreviousSessionCard'
 import RestTimer from '../components/RestTimer'
 import CastModal from '../components/CastModal'
+import { notifyRestComplete, requestRestNotificationPermission } from '../lib/restNotification'
 import type { LastPerformance, ProgressionSuggestion, WorkoutSplit } from '../types/workout'
 import { MUSCLE_LABELS_PT } from '../types/muscle'
 
@@ -56,6 +57,12 @@ export default function PlayerScreen() {
   useEffect(() => {
     if (!session) navigate('/', { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Pede permissão de notificação assim que o treino começa — cedo o bastante pra já
+  // valer pro primeiro descanso, mas não travando o carregamento inicial da tela.
+  useEffect(() => {
+    requestRestNotificationPermission()
   }, [])
 
   // O gesto de voltar do Android (swipe na borda) e o botão físico de voltar disparam
@@ -252,7 +259,13 @@ export default function PlayerScreen() {
         )}
       </div>
 
-      {restTimer && !allExercisesComplete && <RestTimer key={restTimer.key} seconds={restTimer.seconds} />}
+      {restTimer && !allExercisesComplete && (
+        <RestTimer
+          key={restTimer.key}
+          seconds={restTimer.seconds}
+          onFinish={() => notifyRestComplete(currentExercise.name)}
+        />
+      )}
 
       {allExercisesComplete && (
         <div className="fixed inset-x-0 bottom-0 mx-auto max-w-2xl border-t border-(--color-border) bg-(--color-bg) p-4">

@@ -313,9 +313,9 @@ depender de memória de conversa.
   faltava o jeito de criar plano fora do chat do coach e a gestão de vários planos. Ver
   decisões sobre deload/periodização e consolidação de split abaixo.
 Prioridade combinada em 24/09/2026 pros itens ainda abertos, pra depois de fechar a
-biblioteca de exercícios (em discussão): 1º Gestão de equipamento (✅ concluído) → **2º
-Notificação OS-level → 3º Aba Coach → 4º Streaks**. Os números `[Nº]` abaixo marcam essa
-ordem.
+biblioteca de exercícios (em discussão): 1º Gestão de equipamento (✅ concluído) → 2º
+Notificação OS-level (✅ concluído, versão possível sem código nativo) → **3º Aba Coach →
+4º Streaks**. Os números `[Nº]` abaixo marcam essa ordem.
 
 - [ ] `[4º]` **Streaks/gamificação** (dias seguidos, contagem de treinos) — não iniciado.
 - [~] **Biblioteca de exercícios com vídeo/instruções passo-a-passo** (em discussão em
@@ -324,8 +324,11 @@ ordem.
   tomada: não perseguir paridade 1:1 com o free-exercise-db (fonte inicial, que deve
   progressivamente desaparecer) — a ExerciseDB (GIF animado real) é a fonte de referência
   daqui pra frente. Ver decisão detalhada sobre ingestão/cota abaixo.
-- [ ] `[2º]` **Notificação OS-level "descanso concluído"** — gap real, nunca implementado. Ver
-  decisão sobre Live Activity/AOD abaixo (bloqueado por infra nativa).
+- [x] **Notificação "descanso concluído"** (concluído em 24/09/2026, versão possível sem
+  empacotamento nativo) — vibração + notificação OS-level via Service Worker quando a aba
+  está em background. A Live Activity/AOD de verdade (progress bar persistente, sempre
+  visível) continua bloqueada por infra nativa (decisão já registrada abaixo, inalterada).
+  Ver decisão detalhada sobre o que essa versão cobre e não cobre abaixo.
 - [x] **Gestão de equipamento como tela dedicada** (concluído em 24/09/2026) — antes só dava
   pra editar equipamento dentro do fluxo de onboarding. Ver prints do "My gym" do Alpha
   (`design-reference/`) e decisão de escopo abaixo.
@@ -489,6 +492,25 @@ ordem.
   essa tela. A ideia do inventário de cargas específicas (ligaria direto com
   `suggestNextLoad`/dupla progressão) ficou anotada como possível next step, não descartada
   — só fora do escopo desta rodada.
+- **Notificação "descanso concluído" é vibração + Web Notification via Service Worker —
+  não uma Live Activity, e não é garantida com a tela travada.** `src/lib/
+  restNotification.ts`: `requestRestNotificationPermission()` pede permissão de
+  notificação uma vez (nunca insiste se o usuário negar), chamada ao montar o
+  `PlayerScreen`; `notifyRestComplete(nomeDoExercício)` roda no `onFinish` do `RestTimer`
+  (nunca usado antes — o timer só existia visualmente) e faz duas coisas: (1) vibra sempre
+  que o navegador suporta (`navigator.vibrate`), sem precisar de permissão; (2) só dispara
+  a notificação OS-level de verdade quando `document.hidden` é true — se o usuário está
+  olhando pro app, o pill virando vermelho já é o sinal, notificação ali seria redundante.
+  A notificação usa `registration.showNotification(...)` (via `navigator.serviceWorker
+  .ready`), não o construtor `new Notification()` direto — no Android o Chrome exige o
+  caminho do Service Worker pra notificação de página. Testado batendo diretamente na API
+  real (build de produção via `vite preview`, permissão concedida via contexto do
+  Playwright, aba marcada como oculta): confirma o service worker ativo e a notificação
+  sendo criada com o título/corpo esperados. Limite honesto, documentado de propósito: isso
+  cobre o caso comum de "troquei de app com a tela ligada" — com a tela travada/bloqueada,
+  o navegador pode suspender a aba e a notificação simplesmente não dispara; isso só seria
+  resolvido com a Live Activity/AOD nativa já registrada como bloqueada abaixo (empacotamento
+  nativo, não implementado).
 - **Correção de série já registrada precisa de round-trip ao backend** —
   `PATCH /sessions/:id/sets/:setId` (`server/routes/sessions.ts`), reaproveitando a mesma
   lógica de recálculo de recorde pessoal do POST (extraída pra `maybeUpdatePR`). Editar um
