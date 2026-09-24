@@ -4,8 +4,10 @@ import type { Exercise } from '../types/exercise.ts'
 import type { MuscleId } from '../types/muscle.ts'
 import type { WorkoutSplit } from '../types/workout.ts'
 
-// Ordem de equipamentos preferida para exercícios-âncora (multiarticulares antes de isolados).
-const EQUIPMENT_PRIORITY = ['barbell', 'dumbbell', 'machine', 'cable', 'body only', 'other']
+// Ordem de equipamentos preferida para exercícios-âncora. Dumbbell primeiro de propósito —
+// é o equipamento que o usuário realmente tem hoje (academia caseira) — antes de barra/
+// máquina/cabo, que dependem de equipamento que ele pode não ter.
+const EQUIPMENT_PRIORITY = ['dumbbell', 'barbell', 'machine', 'cable', 'body only', 'other']
 
 // Todo split inclui abs + obliques — não existe mais um dia dedicado só a "Core"; cada
 // treino de força carrega algum trabalho de core junto, do jeito que a maioria dos splits

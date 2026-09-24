@@ -172,13 +172,16 @@ async function fetchAllExerciseDbItems(headers: Record<string, string>): Promise
 
 // Ordem de prioridade de equipamento nos valores usados pela ExerciseDB (diferem dos
 // valores do free-exercise-db). Usada só para escolher QUAIS exercícios merecem gastar
-// cota baixando o GIF real — não afeta o restante do catálogo.
+// cota baixando o GIF real — não afeta o restante do catálogo. Dumbbell vem primeiro de
+// propósito: é o equipamento que o usuário realmente tem hoje (academia caseira com
+// halteres), então os exercícios que ele mais vai ver na prática devem ser os primeiros a
+// ganhar GIF real, antes de gastar cota em barra/máquina que ele não possui ainda.
 const EXERCISEDB_EQUIPMENT_PRIORITY = [
+  'dumbbell',
   'barbell',
   'ez barbell',
   'olympic barbell',
   'trap bar',
-  'dumbbell',
   'smith machine',
   'leverage machine',
   'sled machine',
@@ -193,8 +196,11 @@ function equipmentRank(equipment: string): number {
 }
 
 // Máximo de exercícios por músculo para os quais baixamos o GIF real (cada download
-// gasta 1 requisição da cota mensal gratuita da RapidAPI — ver README).
-const MAX_GIFS_PER_MUSCLE = 15
+// gasta 1 requisição da cota mensal gratuita da RapidAPI — ver README). Subiu de 15 pra 40
+// pra ampliar bastante a cobertura de GIF real; seguro porque o script já pula exercícios
+// já baixados em execuções anteriores (não gasta cota de novo) e não quebra se a cota
+// acabar no meio (só loga a falha e segue pro próximo).
+const MAX_GIFS_PER_MUSCLE = 40
 const GIF_RESOLUTION = 180
 
 /**
