@@ -43,4 +43,5 @@ export const EQUIPMENT_OPTIONS: { id: string; label: string }[] = [
   { id: 'body only', label: 'Peso do corpo' },
   { id: 'kettlebells', label: 'Kettlebell' },
   { id: 'bands', label: 'Elásticos' },
+  { id: 'pull-up bar', label: 'Barra fixa' },
 ]

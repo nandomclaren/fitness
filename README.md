@@ -597,6 +597,32 @@ concluído) → 4º Streaks (✅ concluído — fecha essa rodada de priorizaç�
   agendado não mexe no plano ativo; forçar a data pro passado (via SQL direto, simulando
   "a data chegou") faz `GET /plan/active` promover o agendado e arquivar o antigo sozinho,
   sem nenhuma ação do usuário.
+- **Bug real: IA e regra fixa sugeriam exercício de barra fixa mesmo sem o usuário ter
+  marcado esse equipamento.** Causa raiz: o catálogo tagueia pull-up/chin-up com
+  `equipment: "body only"` (sem peso EXTERNO adicionado, tecnicamente correto) — mas isso
+  ignora que ainda precisa de um equipamento físico pra pendurar, diferente de um push-up.
+  Como "Peso do corpo" é o equipamento que praticamente todo mundo marca, o filtro deixava
+  passar. `src/lib/pullupBar.ts` (`requiresPullupBar`, mesmo padrão heurístico por nome já
+  usado em `unilateral.ts`) detecta esses casos; `effectiveEquipment` (`src/lib/
+  equipment.ts`) só reclassifica pra `"pull-up bar"` quando o equipamento cru já normaliza
+  pra `"body only"` — variantes já tagueadas com equipamento de verdade (ex.: as máquinas
+  de pull-up assistido, `"leverage machine"`) NÃO são tocadas, continuam exigindo máquina,
+  não barra (bug real encontrado testando a correção original: o regex batia no nome delas
+  também e as reclassificava errado). Novo equipamento `"pull-up bar"` (rótulo "Barra
+  fixa") em `EQUIPMENT_OPTIONS`, desmarcado por padrão pra todo mundo (inclusive usuários
+  já cadastrados, que nunca confirmaram ter uma). A checagem por nome/`nameEn` roda contra
+  os objetos `Exercise` completos (`idsForEquipment`, novo em `server/exercises.ts`) e não
+  contra `compactCatalog()` — que não carrega `nameEn` de propósito, pra não inflar o
+  catálogo enviado no prompt da IA com um campo só usado nesse cálculo interno. Aplicado
+  nos três lugares que filtram catálogo por equipamento disponível (`plans.ts`, `coach.ts`
+  — que antes não filtrava o catálogo por equipamento nenhum, só descrevia em texto, mesma
+  classe de bug — e `routine.ts`) e no fallback de regra fixa (`bestExerciseFor` em
+  `src/lib/routine.ts`). De brinde, a mesma rota `routine.ts` tinha o MESMO bug de schema
+  `maxItems` já corrigido em `plans.ts`/`coach.ts` — nunca tinha sido exercitado em
+  produção ainda, corrigido agora também. Testado via API real: sem "Barra fixa" marcada,
+  5 gerações de plano de 4 rotinas (20 rotinas no total) sem nenhum vazamento; com "Peso do
+  corpo" + "Barra fixa" como único equipamento (forçando o alvo "lats" a não ter opção
+  melhor ranqueada), o chin-up aparece corretamente.
 - **Correção de série já registrada precisa de round-trip ao backend** —
   `PATCH /sessions/:id/sets/:setId` (`server/routes/sessions.ts`), reaproveitando a mesma
   lógica de recálculo de recorde pessoal do POST (extraída pra `maybeUpdatePR`). Editar um

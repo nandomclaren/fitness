@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '../prisma.ts'
-import { compactCatalog, exercises, getExercise } from '../exercises.ts'
+import { compactCatalog, exercises, getExercise, idsForEquipment } from '../exercises.ts'
 import { describeProgressionTrend, topSetPerSession } from '../progressionTrend.ts'
 import { MUSCLE_LABELS_PT } from '../../src/types/muscle.ts'
 import { activateDueScheduledPlans } from './plans.ts'
@@ -267,7 +267,16 @@ coachRouter.post('/coach/messages', async (req, res) => {
   })
 
   const contextText = await buildContextText()
-  const catalog = compactCatalog()
+  let catalog = compactCatalog()
+  const goalsRow = await prisma.userGoals.findUnique({ where: { id: 'me' } })
+  if (goalsRow?.equipment.length) {
+    const allowedIds = idsForEquipment(goalsRow.equipment)
+    const filtered = catalog.filter((e) => allowedIds.has(e.id))
+    // Mesmo critério do gerador de plano: só aplica o filtro se sobrar catálogo
+    // suficiente pra IA ter opção de verdade — evita travar numa lista minúscula se o
+    // usuário marcou pouco equipamento.
+    if (filtered.length >= 15) catalog = filtered
+  }
 
   try {
     const response = await client.messages.create({

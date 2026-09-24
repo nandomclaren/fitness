@@ -1,10 +1,9 @@
 import { Router } from 'express'
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '../prisma.ts'
-import { compactCatalog, exercises, getExercise } from '../exercises.ts'
+import { compactCatalog, exercises, getExercise, idsForEquipment } from '../exercises.ts'
 import { buildSuggestedRoutine, SPLIT_LABELS_PT } from '../../src/lib/routine.ts'
 import { getPrescription } from '../../src/lib/prescription.ts'
-import { normalizeEquipment } from '../../src/lib/equipment.ts'
 import { MUSCLE_LABELS_PT } from '../../src/types/muscle.ts'
 import { describeProgressionTrend, topSetPerSession } from '../progressionTrend.ts'
 import type { WorkoutSplit } from '../../src/types/workout.ts'
@@ -244,10 +243,10 @@ async function generateWithAi(
   goals: UserGoals | null,
   historySummary: string | null,
 ): Promise<{ name: string; rationale: string; routines: PlanRoutineData[] }> {
-  const allowedEquipment = goals?.equipment.length ? new Set(goals.equipment) : null
   let catalog = compactCatalog()
-  if (allowedEquipment) {
-    const filtered = catalog.filter((e) => allowedEquipment.has(normalizeEquipment(e.equipment)))
+  if (goals?.equipment.length) {
+    const allowedIds = idsForEquipment(goals.equipment)
+    const filtered = catalog.filter((e) => allowedIds.has(e.id))
     if (filtered.length >= 15) catalog = filtered
   }
 

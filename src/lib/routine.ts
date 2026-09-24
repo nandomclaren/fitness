@@ -1,5 +1,5 @@
 import { exercises } from './exercises.ts'
-import { normalizeEquipment } from './equipment.ts'
+import { effectiveEquipment, normalizeEquipment } from './equipment.ts'
 import type { Exercise } from '../types/exercise.ts'
 import type { MuscleId } from '../types/muscle.ts'
 import type { WorkoutSplit } from '../types/workout.ts'
@@ -51,7 +51,7 @@ function bestExerciseFor(
     candidates = candidates.filter((e) => !excludePattern.test(e.nameEn) && !excludePattern.test(e.name))
   }
   if (allowedEquipment) {
-    const filtered = candidates.filter((e) => allowedEquipment.has(normalizeEquipment(e.equipment)))
+    const filtered = candidates.filter((e) => allowedEquipment.has(effectiveEquipment(e)))
     // Se nada bater com o equipamento disponível, prefere mostrar alguma opção a pular
     // o grupo muscular inteiro — cai de volta pra lista sem o filtro.
     if (filtered.length > 0) candidates = filtered

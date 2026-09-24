@@ -1,9 +1,8 @@
 import { Router } from 'express'
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '../prisma.ts'
-import { compactCatalog, exercises } from '../exercises.ts'
+import { compactCatalog, exercises, idsForEquipment } from '../exercises.ts'
 import { buildSuggestedRoutine, SPLIT_MUSCLES } from '../../src/lib/routine.ts'
-import { normalizeEquipment } from '../../src/lib/equipment.ts'
 import type { WorkoutSplit } from '../../src/types/workout.ts'
 
 export const routineRouter = Router()
@@ -26,9 +25,8 @@ const PROPOSE_ROUTINE_TOOL: Anthropic.Tool = {
       exerciseIds: {
         type: 'array',
         items: { type: 'string' },
-        minItems: 3,
-        maxItems: 9,
-        description: 'IDs de exercícios do catálogo fornecido, na ordem de execução sugerida.',
+        description:
+          'Entre 3 e 9 IDs de exercícios do catálogo fornecido, na ordem de execução sugerida.',
       },
       rationale: {
         type: 'string',
@@ -63,8 +61,8 @@ routineRouter.post('/routine/suggested', async (req, res) => {
     const targetMuscles = SPLIT_MUSCLES[split]
     let catalog = compactCatalog().filter((e) => targetMuscles.includes(e.target))
     if (goals?.equipment.length) {
-      const allowedEquipment = new Set(goals.equipment)
-      const filtered = catalog.filter((e) => allowedEquipment.has(normalizeEquipment(e.equipment)))
+      const allowedIds = idsForEquipment(goals.equipment)
+      const filtered = catalog.filter((e) => allowedIds.has(e.id))
       // Só aplica o filtro se sobrar catálogo suficiente pra IA escolher de verdade.
       if (filtered.length >= 10) catalog = filtered
     }
@@ -120,7 +118,7 @@ routineRouter.post('/routine/suggested', async (req, res) => {
     const input = toolUse.input as { exerciseIds: string[]; rationale: string }
 
     const validIds = new Set(exercises.map((e) => e.id))
-    const filteredIds = input.exerciseIds.filter((id) => validIds.has(id))
+    const filteredIds = input.exerciseIds.filter((id) => validIds.has(id)).slice(0, 9)
 
     if (filteredIds.length < 3) {
       const fallback = buildSuggestedRoutine(split, goals?.equipment)
