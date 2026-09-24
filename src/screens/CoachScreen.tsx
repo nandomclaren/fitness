@@ -197,7 +197,9 @@ export default function CoachScreen() {
     <div className="mx-auto flex min-h-svh max-w-lg flex-col px-5 pb-40 pt-10">
       <header className="mb-4">
         <h1 className="text-xl font-bold leading-tight">Coach</h1>
-        <p className="text-sm text-(--color-text-muted)">Converse sobre seus treinos e ajustes</p>
+        <p className="text-sm text-(--color-text-muted)">
+          Sua consulta com o treinador — evolução, ajustes e equipamento
+        </p>
       </header>
 
       <div className="flex-1 overflow-y-auto">
@@ -209,7 +211,8 @@ export default function CoachScreen() {
           <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-(--color-border) p-10 text-center">
             <Sparkles size={28} className="text-(--color-text-muted)" />
             <p className="text-sm text-(--color-text-muted)">
-              Conte pro coach como os treinos recentes foram, ou peça pra revisar sua progressão.
+              Pergunte "estou evoluindo?", peça pra revisar sua progressão, ou pergunte se vale
+              a pena comprar equipamento novo — o coach responde olhando seu histórico real.
             </p>
           </div>
         )}

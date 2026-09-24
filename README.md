@@ -314,8 +314,8 @@ depender de memória de conversa.
   decisões sobre deload/periodização e consolidação de split abaixo.
 Prioridade combinada em 24/09/2026 pros itens ainda abertos, pra depois de fechar a
 biblioteca de exercícios (em discussão): 1º Gestão de equipamento (✅ concluído) → 2º
-Notificação OS-level (✅ concluído, versão possível sem código nativo) → **3º Aba Coach →
-4º Streaks**. Os números `[Nº]` abaixo marcam essa ordem.
+Notificação OS-level (✅ concluído, versão possível sem código nativo) → 3º Aba Coach (✅
+concluído) → **4º Streaks**. Os números `[Nº]` abaixo marcam essa ordem.
 
 - [ ] `[4º]` **Streaks/gamificação** (dias seguidos, contagem de treinos) — não iniciado.
 - [~] **Biblioteca de exercícios com vídeo/instruções passo-a-passo** (em discussão em
@@ -332,15 +332,12 @@ Notificação OS-level (✅ concluído, versão possível sem código nativo) �
 - [x] **Gestão de equipamento como tela dedicada** (concluído em 24/09/2026) — antes só dava
   pra editar equipamento dentro do fluxo de onboarding. Ver prints do "My gym" do Alpha
   (`design-reference/`) e decisão de escopo abaixo.
-- [ ] `[3º]` **Aba "Coach" conversacional pra discutir evolução** (pedido em 24/09/2026, roadmap —
-  explicitamente não é pra agora). O mesmo coach que monta as rotinas e conhece o histórico
-  do usuário deve conseguir bater papo tipo "consulta com o personal": responder perguntas
-  como "estou evoluindo?", "eu deveria comprar anilhas novas?", "você recomenda fita ou
-  barbell pra diversificar o treino?" — analisando dados reais de sessões passadas, não
-  resposta genérica. Já existe `CoachMessage`/chat com tool-use (`server/routes/coach.ts` —
-  hoje só propõe planos); esse recurso amplia esse mesmo coach pra também analisar
-  histórico/progressão quando o usuário pergunta, em vez de só gerar planos novos. Não
-  iniciado.
+- [x] **Coach conversacional pra discutir evolução** (concluído em 24/09/2026) — pedido
+  original: "estou evoluindo?", "eu deveria comprar anilhas novas?", "você recomenda fita ou
+  barbell pra diversificar o treino?", respondido com dados reais, não resposta genérica.
+  A aba "Coach" e o chat com tool-use já existiam (`server/routes/coach.ts`) — não era um
+  recurso novo, era o MESMO coach ganhando escopo e dado pra sustentar esse tipo de
+  pergunta. Ver decisão detalhada abaixo.
 - [x] **Qualidade da geração de exercícios/rotinas** (concluído em 24/09/2026) — usuário
   comparou lado a lado com o Alpha Progression e constatou que a geração de lá pensa como
   coach de verdade (3 exercícios de ombro cobrindo cabeças anterior/lateral/posterior,
@@ -511,6 +508,27 @@ Notificação OS-level (✅ concluído, versão possível sem código nativo) �
   o navegador pode suspender a aba e a notificação simplesmente não dispara; isso só seria
   resolvido com a Live Activity/AOD nativa já registrada como bloqueada abaixo (empacotamento
   nativo, não implementado).
+- **Coach conversacional: ampliar o coach existente, não construir um novo.** Investigando
+  o pedido, `server/routes/coach.ts` já tinha chat com tool-use, contexto com
+  goals/plano ativo/últimas 12 sessões, e a aba "Coach" já existia na navegação — o gap
+  real era de ESCOPO (prompt só falava de "ajustar séries/reps/carga") e de PROFUNDIDADE DE
+  DADO (12 sessões cobre só ~1 mês, curto pra responder "estou evoluindo?" sobre um bloco
+  inteiro), não de infraestrutura faltando. Duas mudanças: (1) `buildContextText` ganhou um
+  segundo bloco, tendência de progressão por exercício nos últimos 90 dias (primeira sessão
+  do período vs. mais recente), extraído em `server/progressionTrend.ts`
+  (`topSetPerSession` + `describeProgressionTrend`) e reaproveitado também por
+  `buildHistorySummary` em `plans.ts` — antes essa lógica de comparação de série de topo
+  estava duplicada quase igual nos dois arquivos; (2) o `SYSTEM_PROMPT` ganhou uma seção
+  nova convidando explicitamente pra tratar a conversa como consulta ("marcar horário com
+  o treinador"), com instrução concreta de COMO responder "estou evoluindo?" (números reais
+  da tendência, nunca "sim"/"não" vago) e recomendação de compra de equipamento (raciocinar
+  a partir do que trava a evolução hoje — halteres fixos → anilhas/ajustável; falta de
+  variedade → equipamento que abre padrão de movimento novo — nunca sugestão genérica
+  desconectada dos dados). Copy da tela (`CoachScreen.tsx`) atualizada pra sinalizar esse
+  uso (subtítulo + estado vazio). Testado bater na rota real (sem chave de IA configurada
+  neste ambiente, então só validando a montagem do contexto antes da chamada falhar): o
+  resumo de tendência saiu correto a partir de sessões simuladas (supino evoluindo,
+  elevação lateral estagnada, press caindo).
 - **Correção de série já registrada precisa de round-trip ao backend** —
   `PATCH /sessions/:id/sets/:setId` (`server/routes/sessions.ts`), reaproveitando a mesma
   lógica de recálculo de recorde pessoal do POST (extraída pra `maybeUpdatePR`). Editar um

@@ -6,6 +6,7 @@ import { buildSuggestedRoutine, SPLIT_LABELS_PT } from '../../src/lib/routine.ts
 import { getPrescription } from '../../src/lib/prescription.ts'
 import { normalizeEquipment } from '../../src/lib/equipment.ts'
 import { MUSCLE_LABELS_PT } from '../../src/types/muscle.ts'
+import { describeProgressionTrend, topSetPerSession } from '../progressionTrend.ts'
 import type { WorkoutSplit } from '../../src/types/workout.ts'
 import type { UserGoals } from '../../src/types/goals.ts'
 
@@ -224,36 +225,11 @@ async function buildHistorySummary(): Promise<string | null> {
     const exercise = getExercise(exerciseId)
     if (!exercise) continue
 
-    const topSetPerSession = sessions
-      .map((s) => {
-        const setsForExercise = s.sets.filter((set) => set.exerciseId === exerciseId)
-        if (setsForExercise.length === 0) return null
-        return setsForExercise.reduce((best, set) =>
-          set.weightKg > best.weightKg || (set.weightKg === best.weightKg && set.reps > best.reps)
-            ? set
-            : best,
-        )
-      })
-      .filter((s): s is NonNullable<typeof s> => s !== null)
+    const topSets = topSetPerSession(sessions, exerciseId)
+    if (topSets.length === 0) continue
 
-    if (topSetPerSession.length === 0) continue
-
-    const first = topSetPerSession[0]
-    const last = topSetPerSession[topSetPerSession.length - 1]
     const muscleLabel = MUSCLE_LABELS_PT[exercise.target]
-
-    let trendText: string
-    if (topSetPerSession.length < 2) {
-      trendText = 'só 1 sessão registrada — dado insuficiente pra avaliar tendência'
-    } else if (last.weightKg > first.weightKg || (last.weightKg === first.weightKg && last.reps > first.reps)) {
-      trendText = `evoluiu de ${first.weightKg}kg×${first.reps} (RIR ${first.rir}) para ${last.weightKg}kg×${last.reps} (RIR ${last.rir}) — progredindo bem, pode manter ênfase ou intensificar`
-    } else if (last.weightKg === first.weightKg && last.reps === first.reps) {
-      trendText = `estagnado em ${last.weightKg}kg×${last.reps} (RIR ${last.rir}) por ${topSetPerSession.length} sessões — considere trocar de exercício ou variante pra dar um estímulo novo`
-    } else {
-      trendText = `caiu de ${first.weightKg}kg×${first.reps} para ${last.weightKg}kg×${last.reps} — investigue fadiga/recuperação antes de intensificar`
-    }
-
-    lines.push(`- ${exercise.name} (${muscleLabel}): ${topSetPerSession.length} sessão(ões), ${trendText}`)
+    lines.push(`- ${exercise.name} (${muscleLabel}): ${topSets.length} sessão(ões), ${describeProgressionTrend(topSets)}`)
   }
 
   if (lines.length === 0) return null

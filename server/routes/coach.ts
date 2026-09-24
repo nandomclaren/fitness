@@ -1,7 +1,9 @@
 import { Router } from 'express'
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '../prisma.ts'
-import { compactCatalog, exercises } from '../exercises.ts'
+import { compactCatalog, exercises, getExercise } from '../exercises.ts'
+import { describeProgressionTrend, topSetPerSession } from '../progressionTrend.ts'
+import { MUSCLE_LABELS_PT } from '../../src/types/muscle.ts'
 
 export const coachRouter = Router()
 
@@ -67,6 +69,23 @@ const SYSTEM_PROMPT =
   'português, de forma direta e prática, olhando o histórico real de treinos do usuário ' +
   '(cargas, reps e RIR — reps in reserve — logados) para decidir e explicar ajustes de ' +
   'progressão de carga, volume ou esquema de séries/reps.\n\n' +
+  'Essa conversa não serve só pra ajustar séries — é o espaço pro usuário marcar, na prática, ' +
+  'uma consulta com você como marcaria com um personal de verdade. Pergunte com naturalidade e ' +
+  'trate como parte normal do seu trabalho perguntas como "estou evoluindo?", "vale a pena ' +
+  'comprar anilhas novas?" ou "compro fita elástica ou uma barra pra diversificar o treino?" — ' +
+  'nunca responda essas perguntas de forma genérica; use o resumo de tendência de progressão ' +
+  'por exercício (fornecido no contexto, dos últimos ~90 dias) e o equipamento que o usuário ' +
+  'já tem (também no contexto) pra dar uma resposta concreta e pessoal:\n' +
+  '- "Estou evoluindo?": olhe a tendência por exercício — se a maioria progrediu (peso/reps ' +
+  'subiram), diga isso com números reais; se vários estagnaram, aponte quais e por quê ' +
+  '(plateau real, falta de variedade, recuperação insuficiente); nunca dê um "sim"/"não" vago.\n' +
+  '- Recomendação de compra de equipamento: raciocine a partir do que trava a evolução hoje. ' +
+  'Ex.: halteres fixos limitando progressão de carga em vários exercícios estagnados → ' +
+  'halteres ajustáveis ou anilhas extras tende a valer mais que um acessório novo; falta de ' +
+  'variedade de estímulo (mesmos exercícios há semanas) → um equipamento que abra ângulos/ ' +
+  'padrões de movimento novos (ex.: faixa elástica pra trabalho unilateral e resistência ' +
+  'variável) pode valer mais que duplicar o que já existe. Sempre parta do que já está ' +
+  'disponível — nunca recomende comprar algo que resolve um problema que os dados não mostram.\n\n' +
   'Regras importantes:\n' +
   '- Nunca invente números sem justificativa: baseie ajustes de carga em sinais reais do ' +
   'histórico (ex.: bateu o teto da faixa de reps em várias sessões seguidas com RIR alto → ' +
@@ -138,8 +157,16 @@ interface HistorySession {
   sets: Array<{ exerciseId: string; weightKg: number; reps: number; rir: number }>
 }
 
+// Janela mais longa que as "últimas 12 sessões" de baixo — 12 sessões cobre só ~1 mês pra
+// quem treina 3x/semana, curto demais pra responder "estou evoluindo?" sobre um bloco
+// inteiro. 90 dias dá uma visão de bloco completo sem deixar o prompt crescer sem limite
+// conforme o histórico do usuário acumula meses/anos de uso.
+const PROGRESSION_WINDOW_DAYS = 90
+
 async function buildContextText(): Promise<string> {
-  const [goals, activePlan, recentSessions] = await Promise.all([
+  const windowStart = new Date(Date.now() - PROGRESSION_WINDOW_DAYS * 86_400_000)
+
+  const [goals, activePlan, recentSessions, windowSessions] = await Promise.all([
     prisma.userGoals.findUnique({ where: { id: 'me' } }),
     prisma.workoutPlan.findFirst({
       where: { status: 'active' },
@@ -149,6 +176,11 @@ async function buildContextText(): Promise<string> {
       where: { finishedAt: { not: null } },
       orderBy: { startedAt: 'desc' },
       take: 12,
+      include: { sets: true },
+    }),
+    prisma.workoutSession.findMany({
+      where: { finishedAt: { not: null }, startedAt: { gte: windowStart } },
+      orderBy: { startedAt: 'asc' },
       include: { sets: true },
     }),
   ])
@@ -175,8 +207,33 @@ async function buildContextText(): Promise<string> {
     })),
   }))
 
+  // Tendência por exercício nos últimos ~90 dias — é a base real pra responder "estou
+  // evoluindo?" sobre o bloco inteiro, não só o ajuste fino de carga da sessão mais recente
+  // (que já vem coberto pelo histórico detalhado acima).
+  const exerciseIdsInWindow = [
+    ...new Set(windowSessions.flatMap((s) => s.sets.map((set) => set.exerciseId))),
+  ]
+  const progressionLines = exerciseIdsInWindow
+    .map((exerciseId) => {
+      const exercise = getExercise(exerciseId)
+      if (!exercise) return null
+      const topSets = topSetPerSession(windowSessions, exerciseId)
+      if (topSets.length < 2) return null
+      const muscleLabel = MUSCLE_LABELS_PT[exercise.target]
+      return `- ${exercise.name} (${muscleLabel}): ${topSets.length} sessões em ~${PROGRESSION_WINDOW_DAYS}d, ${describeProgressionTrend(topSets)}`
+    })
+    .filter((line): line is string => line !== null)
+
+  const progressionText =
+    progressionLines.length > 0
+      ? `Tendência de progressão por exercício nos últimos ${PROGRESSION_WINDOW_DAYS} dias ` +
+        `(comparando a série de topo da primeira sessão com a mais recente no período):\n` +
+        progressionLines.join('\n')
+      : `Sem dados suficientes ainda pra calcular tendência de progressão (menos de 2 ` +
+        `sessões por exercício nos últimos ${PROGRESSION_WINDOW_DAYS} dias).`
+
   return (
-    `${goalsText}\n${planText}\n\n` +
+    `${goalsText}\n${planText}\n\n${progressionText}\n\n` +
     `Histórico das últimas ${history.length} sessões concluídas (mais recente primeiro, ` +
     `séries na ordem em que foram feitas):\n${JSON.stringify(history)}`
   )
