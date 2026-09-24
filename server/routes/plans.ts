@@ -1,10 +1,11 @@
 import { Router } from 'express'
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '../prisma.ts'
-import { compactCatalog, exercises } from '../exercises.ts'
+import { compactCatalog, exercises, getExercise } from '../exercises.ts'
 import { buildSuggestedRoutine, SPLIT_LABELS_PT } from '../../src/lib/routine.ts'
 import { getPrescription } from '../../src/lib/prescription.ts'
 import { normalizeEquipment } from '../../src/lib/equipment.ts'
+import { MUSCLE_LABELS_PT } from '../../src/types/muscle.ts'
 import type { WorkoutSplit } from '../../src/types/workout.ts'
 import type { UserGoals } from '../../src/types/goals.ts'
 
@@ -113,7 +114,7 @@ const AI_PLAN_TOOL: Anthropic.Tool = {
   strict: true,
 }
 
-function buildSystemPrompt(splits: WorkoutSplit[]): string {
+function buildSystemPrompt(splits: WorkoutSplit[], hasHistory: boolean): string {
   const splitsText = splits
     .map((s, i) => `Rotina ${i + 1}: split "${s}" (${SPLIT_LABELS_PT[s]})`)
     .join('; ')
@@ -178,14 +179,96 @@ Regras não-negociáveis, na ordem em que devem pesar na sua decisão:
    do plano não cobrem. Escreva também um "rationale" geral do plano (2-4 frases) com a
    filosofia do bloco inteiro. Ambos em português, para o próprio usuário ler.
 
+9. ${
+    hasHistory
+      ? 'Um resumo da progressão real do plano anterior (peso/reps/RIR por exercício, sessão a sessão) vem depois do catálogo. ESTE NÃO É O PRIMEIRO PLANO do usuário — trate-o como evolução do bloco anterior, não como recomeço do zero: pro que está "progredindo bem", mantenha ênfase ou intensifique de propósito (mais série, faixa de rep mais pesada, ou o mesmo exercício com prescrição mais exigente); pro que está "estagnado", troque de exercício ou ao menos de variante — repetir a prescrição que já não gera resultado é o oposto de pensar como coach; pro que "caiu", seja mais conservador (menos volume/intensidade) até a recuperação voltar. Evite repetir a lista de exercícios do plano anterior quase idêntica — mostre que esse plano é o próximo passo, não uma cópia. Cite essa evolução no "rationale" do plano quando fizer sentido.'
+      : 'Nenhum histórico de treino foi fornecido — este É o primeiro plano do usuário nesse app. Monte algo generalista, seguro e bem balanceado; não invente progressão que ainda não existe.'
+  }
+
 Pense como treinador de verdade: um aluno que treina várias vezes por semana percebe na
 hora se a segunda sessão de um mesmo tipo de dia é só um decalque da primeira — isso
 transmite que ninguém pensou naquela sessão específica.`
 }
 
+/**
+ * Resume a progressão real do plano anterior (peso/reps/RIR por exercício, do primeiro pro
+ * último treino registrado) pra alimentar a IA com dado de verdade, não só o formulário de
+ * objetivo/nível. Sem isso, todo plano gerado seria tão genérico quanto o primeiro — pedido
+ * explícito do usuário: "a primeira série é mais generalista, mas todas elas a partir daí
+ * tendem a ser evolutivas em cima da anterior". Retorna null quando não há plano anterior
+ * (primeiro plano do usuário) ou quando o plano anterior nunca chegou a ser treinado de
+ * fato — nesses casos a IA deve continuar gerando um plano genérico e seguro.
+ */
+async function buildHistorySummary(): Promise<string | null> {
+  const previousPlan = await prisma.workoutPlan.findFirst({
+    where: { status: { in: ['active', 'archived'] } },
+    orderBy: { createdAt: 'desc' },
+    include: { routines: { include: { exercises: true } } },
+  })
+  if (!previousPlan) return null
+
+  const routineIds = previousPlan.routines.map((r) => r.id)
+  const sessions = await prisma.workoutSession.findMany({
+    where: { planRoutineId: { in: routineIds }, finishedAt: { not: null } },
+    orderBy: { startedAt: 'asc' },
+    include: { sets: true },
+  })
+  if (sessions.length === 0) return null
+
+  const exerciseIds = [
+    ...new Set(previousPlan.routines.flatMap((r) => r.exercises.map((e) => e.exerciseId))),
+  ]
+
+  const lines: string[] = []
+  for (const exerciseId of exerciseIds) {
+    const exercise = getExercise(exerciseId)
+    if (!exercise) continue
+
+    const topSetPerSession = sessions
+      .map((s) => {
+        const setsForExercise = s.sets.filter((set) => set.exerciseId === exerciseId)
+        if (setsForExercise.length === 0) return null
+        return setsForExercise.reduce((best, set) =>
+          set.weightKg > best.weightKg || (set.weightKg === best.weightKg && set.reps > best.reps)
+            ? set
+            : best,
+        )
+      })
+      .filter((s): s is NonNullable<typeof s> => s !== null)
+
+    if (topSetPerSession.length === 0) continue
+
+    const first = topSetPerSession[0]
+    const last = topSetPerSession[topSetPerSession.length - 1]
+    const muscleLabel = MUSCLE_LABELS_PT[exercise.target]
+
+    let trendText: string
+    if (topSetPerSession.length < 2) {
+      trendText = 'só 1 sessão registrada — dado insuficiente pra avaliar tendência'
+    } else if (last.weightKg > first.weightKg || (last.weightKg === first.weightKg && last.reps > first.reps)) {
+      trendText = `evoluiu de ${first.weightKg}kg×${first.reps} (RIR ${first.rir}) para ${last.weightKg}kg×${last.reps} (RIR ${last.rir}) — progredindo bem, pode manter ênfase ou intensificar`
+    } else if (last.weightKg === first.weightKg && last.reps === first.reps) {
+      trendText = `estagnado em ${last.weightKg}kg×${last.reps} (RIR ${last.rir}) por ${topSetPerSession.length} sessões — considere trocar de exercício ou variante pra dar um estímulo novo`
+    } else {
+      trendText = `caiu de ${first.weightKg}kg×${first.reps} para ${last.weightKg}kg×${last.reps} — investigue fadiga/recuperação antes de intensificar`
+    }
+
+    lines.push(`- ${exercise.name} (${muscleLabel}): ${topSetPerSession.length} sessão(ões), ${trendText}`)
+  }
+
+  if (lines.length === 0) return null
+
+  return (
+    `Plano anterior: "${previousPlan.name}" (${previousPlan.routines.length} rotina(s)), ` +
+    `${sessions.length} sessão(ões) concluída(s). Progressão registrada por exercício:\n` +
+    lines.join('\n')
+  )
+}
+
 async function generateWithAi(
   splits: WorkoutSplit[],
   goals: UserGoals | null,
+  historySummary: string | null,
 ): Promise<{ name: string; rationale: string; routines: PlanRoutineData[] }> {
   const allowedEquipment = goals?.equipment.length ? new Set(goals.equipment) : null
   let catalog = compactCatalog()
@@ -204,7 +287,7 @@ async function generateWithAi(
     output_config: { effort: 'max' },
     tools: [AI_PLAN_TOOL],
     tool_choice: { type: 'tool', name: 'generate_plan' },
-    system: buildSystemPrompt(splits),
+    system: buildSystemPrompt(splits, historySummary !== null),
     messages: [
       {
         role: 'user',
@@ -215,6 +298,7 @@ async function generateWithAi(
             cache_control: { type: 'ephemeral' },
           },
           { type: 'text', text: goalsText },
+          ...(historySummary ? [{ type: 'text' as const, text: historySummary }] : []),
         ],
       },
     ],
@@ -301,7 +385,8 @@ plansRouter.post('/plans', async (req, res) => {
 
   if (mode === 'ai') {
     try {
-      const generated = await generateWithAi(splits, goals)
+      const historySummary = await buildHistorySummary()
+      const generated = await generateWithAi(splits, goals, historySummary)
       routinesData = generated.routines
       rationale = generated.rationale
       if (!name?.trim()) planName = generated.name

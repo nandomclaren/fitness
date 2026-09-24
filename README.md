@@ -417,6 +417,23 @@ depender de memória de conversa.
   travar sempre no mesmo exercício — confirmado por teste manual: um plano de 4 rotinas
   (Superior/Inferior/Superior/Inferior) saiu com zero IDs de exercício repetidos entre
   "Superior" e "Superior 2".
+- **Geração de IA usa histórico real de treino pra evoluir plano a plano — não só objetivo
+  cadastrado.** Pedido explícito do usuário: "a primeira série é mais generalista, mas
+  todas elas a partir daí tendem a ser evolutivas em cima da anterior". `buildHistorySummary`
+  (`server/routes/plans.ts`) busca o plano anterior (`status` active/archived mais recente),
+  pega as sessões concluídas vinculadas a ele (`WorkoutSession.planRoutineId`) e, por
+  exercício, compara a série de topo da primeira sessão registrada com a da última pra
+  classificar a tendência em texto: "progredindo bem" (peso/reps subiram — manter ênfase ou
+  intensificar), "estagnado" (sem mudança por N sessões — trocar exercício/variante) ou
+  "investigue fadiga" (caiu — ser mais conservador). Esse resumo entra como um bloco de texto
+  extra na mensagem pra IA (não cacheado, já que é específico do usuário) e o `system` prompt
+  ganhou uma regra nova (#9) que muda o enquadramento inteiro conforme o histórico existe ou
+  não: com histórico, é pra tratar o plano como evolução explícita do anterior (nunca um
+  recomeço); sem histórico (nenhum plano anterior, ou plano anterior nunca foi treinado de
+  verdade), é o primeiro plano do usuário e deve ficar generalista de propósito — a IA nunca
+  inventa progressão que não existe ainda. Testado manualmente: 3 sessões simuladas (supino
+  evoluindo 60kg→70kg, elevação lateral estagnada em 8kg×12, press regredindo 40kg→30kg)
+  produziram exatamente os 3 rótulos esperados no resumo.
 - **Correção de série já registrada precisa de round-trip ao backend** —
   `PATCH /sessions/:id/sets/:setId` (`server/routes/sessions.ts`), reaproveitando a mesma
   lógica de recálculo de recorde pessoal do POST (extraída pra `maybeUpdatePR`). Editar um
