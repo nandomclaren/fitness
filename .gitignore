@@ -15,6 +15,10 @@ dist-ssr
 .env.*
 !.env.example
 
+# Cache local da listagem da ExerciseDB (scripts/fetch-exercises.ts) — evita repaginar o
+# catálogo inteiro (~140 requisições da cota mensal da RapidAPI) em toda execução.
+scripts/.cache
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

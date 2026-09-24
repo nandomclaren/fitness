@@ -15,6 +15,14 @@
  * Uso:
  *   npm run fetch-exercises                      # fonte "free" (sem chave)
  *   RAPIDAPI_KEY=xxxx npm run fetch-exercises -- --source=exercisedb
+ *   RAPIDAPI_KEY=xxxx npm run fetch-exercises -- --source=exercisedb --refresh-catalog
+ *
+ * A listagem completa da ExerciseDB (metadados de ~1357 exercícios) fica cacheada em
+ * `scripts/.cache/` depois da primeira execução — repaginar isso do zero toda vez custa
+ * ~140 requisições da cota mensal (690 no plano gratuito), então execuções aditivas
+ * seguintes (ex.: só pra subir MAX_GIFS_PER_MUSCLE) reaproveitam o cache sem gastar nada
+ * até chegar na parte de baixar GIF de fato. Use `--refresh-catalog` só se precisar forçar
+ * uma listagem nova (ex.: catálogo da ExerciseDB mudou).
  */
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs'
 import { ProxyAgent, setGlobalDispatcher } from 'undici'
@@ -147,7 +155,27 @@ interface ExerciseDbItem {
   // (ver fetchExerciseDbCuratedGifs), que gasta 1 requisição de cota por exercício.
 }
 
-async function fetchAllExerciseDbItems(headers: Record<string, string>): Promise<ExerciseDbItem[]> {
+// Cache local da listagem completa da ExerciseDB — listar o catálogo inteiro custa ~140
+// requisições (1 por página de 10, o plano gratuito ignora um `limit` maior), o que já é
+// uma fatia grande da cota mensal (690) só pra saber quais exercícios existem, ANTES de
+// gastar mais nada baixando GIF de verdade. Sem esse cache, toda execução do script (ex.:
+// só pra subir MAX_GIFS_PER_MUSCLE e pegar mais alguns exercícios) repagina tudo de novo —
+// foi exatamente isso que estourou a cota numa tentativa de rodar de forma aditiva.
+const CATALOG_CACHE_PATH = new URL('.cache/exercisedb-catalog.json', import.meta.url)
+
+async function fetchAllExerciseDbItems(
+  headers: Record<string, string>,
+  forceRefresh: boolean,
+): Promise<ExerciseDbItem[]> {
+  if (!forceRefresh && existsSync(CATALOG_CACHE_PATH)) {
+    const cached: ExerciseDbItem[] = JSON.parse(readFileSync(CATALOG_CACHE_PATH, 'utf-8'))
+    console.log(
+      `Usando lista de exercícios da ExerciseDB em cache (${cached.length} itens) — 0 requisições gastas. ` +
+        'Rode com --refresh-catalog se precisar forçar uma listagem nova.',
+    )
+    return cached
+  }
+
   // O plano gratuito da RapidAPI para a ExerciseDB ignora um `limit` maior e sempre
   // devolve no máximo 10 itens por página — por isso paginamos até vir uma página vazia,
   // avançando o offset pelo tamanho real recebido (nunca pelo limit pedido).
@@ -167,6 +195,11 @@ async function fetchAllExerciseDbItems(headers: Record<string, string>): Promise
     // Pausa curta entre requisições para não estourar o limite de taxa por segundo do plano gratuito.
     await new Promise((r) => setTimeout(r, 250))
   }
+
+  mkdirSync(new URL('.', CATALOG_CACHE_PATH), { recursive: true })
+  writeFileSync(CATALOG_CACHE_PATH, JSON.stringify(all))
+  console.log(`Lista cacheada localmente — próximas execuções não gastam cota pra listar de novo.`)
+
   return all
 }
 
@@ -204,18 +237,17 @@ const MAX_GIFS_PER_MUSCLE = 40
 const GIF_RESOLUTION = 180
 
 /**
- * Baixa a lista completa de metadados da ExerciseDB (barata: ~140 requisições no total,
- * já que cada página custa 1 requisição independente do tamanho) e, a partir dela,
- * seleciona um subconjunto prioritário (os exercícios mais "âncora" por músculo,
- * priorizando barra/halteres/máquina) para baixar o GIF animado de verdade — o único
- * jeito de exibir a mídia real no navegador, já que o endpoint de imagem exige um header
- * de autenticação que uma tag <img> não consegue enviar, então a imagem precisa ser
+ * Baixa (ou reaproveita do cache local) a lista completa de metadados da ExerciseDB e, a
+ * partir dela, seleciona um subconjunto prioritário (os exercícios mais "âncora" por
+ * músculo, priorizando dumbbell/barra/máquina) para baixar o GIF animado de verdade — o
+ * único jeito de exibir a mídia real no navegador, já que o endpoint de imagem exige um
+ * header de autenticação que uma tag <img> não consegue enviar, então a imagem precisa ser
  * baixada aqui (com a chave) e re-hospedada em public/exercises/gifs/.
  *
  * Esse subconjunto é ADICIONADO ao catálogo existente (não substitui o free-exercise-db),
  * já que baixar o GIF de todos os ~1357 exercícios estouraria a cota gratuita mensal.
  */
-async function fetchExerciseDbCuratedGifs(): Promise<Exercise[]> {
+async function fetchExerciseDbCuratedGifs(forceRefreshCatalog: boolean): Promise<Exercise[]> {
   const apiKey = process.env.RAPIDAPI_KEY
   if (!apiKey) {
     throw new Error(
@@ -229,7 +261,7 @@ async function fetchExerciseDbCuratedGifs(): Promise<Exercise[]> {
     'X-RapidAPI-Host': 'exercisedb.p.rapidapi.com',
   }
 
-  const all = await fetchAllExerciseDbItems(headers)
+  const all = await fetchAllExerciseDbItems(headers, forceRefreshCatalog)
 
   const byMuscle = new Map<MuscleId, ExerciseDbItem[]>()
   for (const item of all) {
@@ -303,6 +335,7 @@ async function fetchExerciseDbCuratedGifs(): Promise<Exercise[]> {
 async function main() {
   const sourceArg = process.argv.find((a) => a.startsWith('--source='))
   const source = sourceArg ? sourceArg.split('=')[1] : 'free'
+  const forceRefreshCatalog = process.argv.includes('--refresh-catalog')
 
   let exercises: Exercise[]
 
@@ -311,7 +344,7 @@ async function main() {
     // subconjunto prioritário com GIFs reais da ExerciseDB, em vez de substituir tudo
     // (baixar o GIF de todos os ~1357 exercícios estouraria a cota gratuita mensal).
     const existing: Exercise[] = JSON.parse(readFileSync(OUT_PATH, 'utf-8'))
-    const curated = await fetchExerciseDbCuratedGifs()
+    const curated = await fetchExerciseDbCuratedGifs(forceRefreshCatalog)
     const existingWithoutEdb = existing.filter((e) => !e.id.startsWith('edb-'))
     exercises = [...curated, ...existingWithoutEdb]
   } else {

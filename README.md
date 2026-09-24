@@ -312,14 +312,22 @@ depender de memória de conversa.
   infra que já existia (`WorkoutPlan`/`PlanRoutine`/`PlanExercise`, `/plan/active`) — só
   faltava o jeito de criar plano fora do chat do coach e a gestão de vários planos. Ver
   decisões sobre deload/periodização e consolidação de split abaixo.
-- [ ] **Streaks/gamificação** (dias seguidos, contagem de treinos) — não iniciado.
-- [ ] **Biblioteca de exercícios com vídeo/instruções passo-a-passo** — hoje só temos
-  imagem estática (`ExerciseMedia`); Alpha tem vídeo em loop + texto de setup/execução.
-- [ ] **Notificação OS-level "descanso concluído"** — gap real, nunca implementado. Ver
+Prioridade combinada em 24/09/2026 pros itens ainda abertos, pra depois de fechar a
+biblioteca de exercícios (em discussão): **1º Gestão de equipamento → 2º Notificação
+OS-level → 3º Aba Coach → 4º Streaks**. Os números `[Nº]` abaixo marcam essa ordem.
+
+- [ ] `[4º]` **Streaks/gamificação** (dias seguidos, contagem de treinos) — não iniciado.
+- [~] **Biblioteca de exercícios com vídeo/instruções passo-a-passo** (em discussão em
+  24/09/2026) — hoje só temos imagem estática (`ExerciseMedia`); Alpha tem vídeo em loop +
+  texto de setup/execução, e o usuário confirmou que não vai produzir vídeo próprio. Decisão
+  tomada: não perseguir paridade 1:1 com o free-exercise-db (fonte inicial, que deve
+  progressivamente desaparecer) — a ExerciseDB (GIF animado real) é a fonte de referência
+  daqui pra frente. Ver decisão detalhada sobre ingestão/cota abaixo.
+- [ ] `[2º]` **Notificação OS-level "descanso concluído"** — gap real, nunca implementado. Ver
   decisão sobre Live Activity/AOD abaixo (bloqueado por infra nativa).
-- [ ] **Gestão de equipamento ("My gym") como tela dedicada** — hoje só existe dentro do
+- [ ] `[1º]` **Gestão de equipamento ("My gym") como tela dedicada** — hoje só existe dentro do
   onboarding; Alpha permite editar a qualquer momento.
-- [ ] **Aba "Coach" conversacional pra discutir evolução** (pedido em 24/09/2026, roadmap —
+- [ ] `[3º]` **Aba "Coach" conversacional pra discutir evolução** (pedido em 24/09/2026, roadmap —
   explicitamente não é pra agora). O mesmo coach que monta as rotinas e conhece o histórico
   do usuário deve conseguir bater papo tipo "consulta com o personal": responder perguntas
   como "estou evoluindo?", "eu deveria comprar anilhas novas?", "você recomenda fita ou
@@ -434,6 +442,34 @@ depender de memória de conversa.
   inventa progressão que não existe ainda. Testado manualmente: 3 sessões simuladas (supino
   evoluindo 60kg→70kg, elevação lateral estagnada em 8kg×12, press regredindo 40kg→30kg)
   produziram exatamente os 3 rótulos esperados no resumo.
+- **ExerciseDB é a fonte de referência daqui pra frente, não o free-exercise-db.**
+  Discutindo o item de roadmap "biblioteca de exercícios com vídeo" (24/09/2026): o usuário
+  não vai produzir vídeo próprio, então a pergunta virou "dá pra pelo menos unificar a mídia
+  que já temos?". Hoje 675/899 exercícios (75%) vêm do free-exercise-db (duas fotos
+  estáticas com crossfade simulando loop, `ExerciseMedia.tsx`) e 224 (25%) vêm da ExerciseDB
+  via RapidAPI (GIF animado real, self-hosted em `public/exercises/gifs/`). Decisão: não
+  perseguir paridade 1:1 entre as fontes — o free-exercise-db foi só a semente inicial e
+  deve progressivamente desaparecer conforme mais exercícios ganham GIF real da ExerciseDB.
+  `EXERCISEDB_EQUIPMENT_PRIORITY` (`scripts/fetch-exercises.ts`) e `EQUIPMENT_PRIORITY`
+  (`src/lib/routine.ts`) agora priorizam **dumbbell antes de barra/máquina** — é o
+  equipamento real que o usuário tem hoje (academia caseira), então tanto os GIFs quanto os
+  exercícios-âncora da rotina devem favorecer isso primeiro. `MAX_GIFS_PER_MUSCLE` subiu de
+  15 pra 40 pra ampliar a cobertura de GIF real.
+- **Cota da RapidAPI (ExerciseDB) é mensal e finita — 690 requisições, plano Basic; upgrade
+  custa US$200, fora de cogitação por ora.** Uma tentativa de rodar `--source=exercisedb`
+  de forma aditiva (só subir `MAX_GIFS_PER_MUSCLE`) estourou a cota do mês inteiro **antes
+  de baixar um único GIF novo**, porque listar o catálogo completo da ExerciseDB (~1357
+  exercícios) sozinho já custa ~140 requisições (paginado, 10 por página no plano grátis) —
+  gasto que se repetia do zero em toda execução. Corrigido: a listagem agora fica cacheada
+  localmente em `scripts/.cache/exercisedb-catalog.json` (gitignored — é cache de
+  ingestão, não dado do app) depois da primeira busca bem-sucedida; execuções futuras
+  reaproveitam o cache sem gastar nada até chegar na parte de baixar GIF de fato. Flag
+  `--refresh-catalog` força uma listagem nova quando precisar. O script em si já era seguro
+  contra estourar cota no meio do download de GIFs (só loga e segue) — o gasto inesperado
+  foi todo na listagem, não nos downloads. Enquanto a cota não reseta (ciclo mensal do
+  RapidAPI, data exata desconhecida) ou o usuário decide pagar o upgrade, a ingestão de
+  novos GIFs fica pausada — não bloqueia o app, que já funciona com o catálogo atual
+  (sobretudo os exercícios de dumbbell, que são os que o usuário realmente usa).
 - **Correção de série já registrada precisa de round-trip ao backend** —
   `PATCH /sessions/:id/sets/:setId` (`server/routes/sessions.ts`), reaproveitando a mesma
   lógica de recálculo de recorde pessoal do POST (extraída pra `maybeUpdatePR`). Editar um
