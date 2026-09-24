@@ -18,7 +18,7 @@ export interface PlanRoutine {
   exercises: PlanExercise[]
 }
 
-export type WorkoutPlanStatus = 'proposed' | 'active' | 'archived'
+export type WorkoutPlanStatus = 'proposed' | 'scheduled' | 'active' | 'archived'
 
 export interface WorkoutPlan {
   id: string
@@ -30,6 +30,8 @@ export interface WorkoutPlan {
   deload: boolean
   /** Desliza a faixa de reps prescrita da semana 1 até a última semana do bloco. */
   linearPeriodization: boolean
+  /** Só presente quando status="scheduled": data em que o plano vira ativo sozinho. */
+  scheduledFor: string | null
   activatedAt: string | null
   createdAt: string
   routines: PlanRoutine[]

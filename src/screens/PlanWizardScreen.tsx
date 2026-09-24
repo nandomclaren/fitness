@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Flame, Layers, Plus, Sparkles, TrendingDown } from 'lucide-react'
+import { CalendarClock, ChevronLeft, Flame, Layers, Plus, Sparkles, TrendingDown } from 'lucide-react'
 import { createPlan } from '../lib/plans.ts'
 import { getExercise } from '../lib/exercises.ts'
 import { MUSCLE_LABELS_PT } from '../types/muscle.ts'
@@ -8,6 +8,17 @@ import type { WorkoutPlan } from '../types/coach.ts'
 
 type Mode = 'rule' | 'ai'
 type Step = 'mode' | 'config' | 'review'
+
+const TODAY_ISO = new Date().toISOString().slice(0, 10)
+
+function formatDatePt(iso: string): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+}
 
 const ROUTINE_COUNT_OPTIONS: { value: number; title: string; subtitle: string }[] = [
   { value: 1, title: '1 rotina', subtitle: 'Corpo inteiro toda vez' },
@@ -26,6 +37,7 @@ export default function PlanWizardScreen() {
   const [durationWeeks, setDurationWeeks] = useState(4)
   const [deload, setDeload] = useState(false)
   const [linearPeriodization, setLinearPeriodization] = useState(false)
+  const [startDate, setStartDate] = useState(TODAY_ISO)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [plan, setPlan] = useState<WorkoutPlan | null>(null)
@@ -40,7 +52,7 @@ export default function PlanWizardScreen() {
     setLoading(true)
     setError(null)
     try {
-      const created = await createPlan({ mode, numRoutines, durationWeeks, deload, linearPeriodization })
+      const created = await createPlan({ mode, numRoutines, durationWeeks, deload, linearPeriodization, startDate })
       setPlan(created)
       setStep('review')
     } catch {
@@ -151,6 +163,24 @@ export default function PlanWizardScreen() {
             </div>
           </section>
 
+          <section>
+            <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-(--color-text-muted)">
+              <CalendarClock size={15} /> Quando começar?
+            </h2>
+            <input
+              type="date"
+              value={startDate}
+              min={TODAY_ISO}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3 text-(--color-text) outline-none focus:border-(--color-primary)"
+            />
+            <p className="mt-2 text-xs text-(--color-text-muted)">
+              {startDate > TODAY_ISO
+                ? `O plano atual continua valendo até ${formatDatePt(startDate)} — esse aqui entra sozinho nesse dia (ou antes, se você ativar outro plano manualmente).`
+                : 'Escolhendo hoje, o plano já entra em vigor assim que for criado.'}
+            </p>
+          </section>
+
           <section className="flex flex-col gap-2">
             <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-(--color-text-muted)">
               Opcional
@@ -196,20 +226,38 @@ export default function PlanWizardScreen() {
             disabled={loading}
             className="w-full rounded-xl bg-(--color-primary) py-4 text-center text-lg font-bold text-white disabled:opacity-60"
           >
-            {loading ? 'Montando...' : mode === 'ai' ? 'Gerar com IA' : 'Criar plano'}
+            {loading
+              ? 'Montando...'
+              : startDate > TODAY_ISO
+                ? 'Agendar plano'
+                : mode === 'ai'
+                  ? 'Gerar com IA'
+                  : 'Criar plano'}
           </button>
         </div>
       )}
 
       {step === 'review' && plan && (
         <div className="flex flex-col gap-5">
-          <div className="rounded-xl border border-(--color-success)/40 bg-(--color-success)/10 p-4">
-            <p className="flex items-center gap-2 font-semibold text-(--color-success)">
-              <Flame size={18} /> Plano ativado
-            </p>
-            <p className="mt-1 text-sm text-(--color-text)">{plan.name}</p>
-            <p className="mt-1 text-xs text-(--color-text-muted)">{plan.rationale}</p>
-          </div>
+          {plan.status === 'scheduled' ? (
+            <div className="rounded-xl border border-(--color-secondary)/40 bg-(--color-secondary)/10 p-4">
+              <p className="flex items-center gap-2 font-semibold text-(--color-secondary)">
+                <CalendarClock size={18} /> Plano agendado
+              </p>
+              <p className="mt-1 text-sm text-(--color-text)">
+                {plan.name} — começa em {plan.scheduledFor && formatDatePt(plan.scheduledFor.slice(0, 10))}
+              </p>
+              <p className="mt-1 text-xs text-(--color-text-muted)">{plan.rationale}</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-(--color-success)/40 bg-(--color-success)/10 p-4">
+              <p className="flex items-center gap-2 font-semibold text-(--color-success)">
+                <Flame size={18} /> Plano ativado
+              </p>
+              <p className="mt-1 text-sm text-(--color-text)">{plan.name}</p>
+              <p className="mt-1 text-xs text-(--color-text-muted)">{plan.rationale}</p>
+            </div>
+          )}
 
           {plan.routines.map((r) => (
             <div key={r.id} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">

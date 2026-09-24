@@ -556,6 +556,46 @@ concluído) → 4º Streaks (✅ concluído — fecha essa rodada de priorizaç�
   Leg Day") que aparecem nos mesmos prints do Alpha NÃO foram implementados — não faziam
   parte do escopo combinado ("streaks/gamificação: dias seguidos, contagem de treinos"), e
   o usuário confirmou que era só curiosidade, não pedido.
+- **Bug real em produção: geração de plano com IA falhava sempre, em ~5s (400, não
+  timeout).** `tools.0.custom: For 'array' type, property 'maxItems' is not supported` —
+  a API da Anthropic rejeita `minItems`/`maxItems` (e, por precaução, tratamos
+  `minimum`/`maximum` do mesmo jeito) no schema de tools custom. Regressão introduzida
+  nesta mesma sessão quando a tool de geração de plano (`AI_PLAN_TOOL` em
+  `server/routes/plans.ts`) ganhou o campo `rationale` por rotina — o schema antigo (sem
+  esses limites) nunca tinha sido testado contra a API de verdade depois da mudança, porque
+  não havia `ANTHROPIC_API_KEY` disponível no sandbox de desenvolvimento; só apareceu
+  quando o usuário testou em produção (Railway, que tem a chave configurada). Corrigido
+  nos dois lugares que usam esse padrão de tool (`AI_PLAN_TOOL` em `plans.ts` e
+  `PROPOSE_PLAN_TOOL` do chat do coach em `coach.ts`, mesmo problema, só não tinha sido
+  exercitado ainda): os limites viraram texto em `description` (orientação pro modelo) e
+  ganharam clamp explícito no código que processa `tool_use.input` (rotinas cortadas em
+  4/10, exercícios em 9/10, sets/reps/descanso dentro da faixa válida) — a corretude não
+  depende mais só do modelo seguir a descrição à risca. Lição prática: sem uma chave de IA
+  real acessível durante o desenvolvimento, mudança de schema de tool só é validada de
+  verdade em produção — vale considerar pedir uma chave de teste pro sandbox se isso se
+  repetir.
+- **Agendamento de início de plano** (pedido em 24/09/2026, junto do bug acima) — usuário
+  queria escolher uma data futura pra um plano novo começar, sem interromper o que já está
+  ativo até lá. `WorkoutPlan` ganhou `scheduledFor DateTime?` e um novo status `"scheduled"`
+  (migração `20260924100000_plan_scheduled_for`). `activateDueScheduledPlans()`
+  (exportada de `plans.ts`, chamada no início de `GET /plans`, `GET /plan/active` e
+  `POST /plans`) ativa sozinho qualquer plano agendado cuja data já chegou, arquivando o
+  que estiver ativo — sem worker/cron dedicado, roda sob demanda nas rotas de leitura, o
+  que é suficiente pra um app de uso pessoal aberto com frequência (se mais de um agendamento
+  estiver vencido, processa em ordem cronológica; o mais recente vencido fica ativo no
+  final, que é o comportamento certo). `POST /plans` aceita `startDate` opcional
+  ("YYYY-MM-DD"); hoje ou omitido = comportamento de sempre (ativa na hora); data futura =
+  cria como `"scheduled"` sem tocar no plano ativo atual. `POST /plans/:id/archive` passou
+  a aceitar cancelar um agendamento pendente também, não só arquivar um ativo — mesmo gesto
+  conceitual. No wizard (`PlanWizardScreen`), a etapa de configuração ganhou um seletor de
+  data nativo (`<input type="date" min={hoje}>`, que já impede escolher o passado sem
+  precisar de calendário customizado) com aviso explicando o que acontece pra cada escolha;
+  o botão final e a tela de revisão mudam de texto/cor conforme o plano vai ativar na hora
+  ou ficar agendado. `AllPlansScreen` ganhou uma badge "Agendado" com a data e dois botões
+  extras nesse card (Ativar agora / Cancelar). Testado de ponta a ponta via API real: criar
+  agendado não mexe no plano ativo; forçar a data pro passado (via SQL direto, simulando
+  "a data chegou") faz `GET /plan/active` promover o agendado e arquivar o antigo sozinho,
+  sem nenhuma ação do usuário.
 - **Correção de série já registrada precisa de round-trip ao backend** —
   `PATCH /sessions/:id/sets/:setId` (`server/routes/sessions.ts`), reaproveitando a mesma
   lógica de recálculo de recorde pessoal do POST (extraída pra `maybeUpdatePR`). Editar um

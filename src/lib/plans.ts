@@ -8,6 +8,8 @@ export interface CreatePlanInput {
   durationWeeks: number
   deload: boolean
   linearPeriodization: boolean
+  /** "YYYY-MM-DD". Omitido ou hoje = ativa na hora; data futura = fica agendado até lá. */
+  startDate?: string
 }
 
 export async function listPlans(): Promise<WorkoutPlan[]> {

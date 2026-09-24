@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Plus } from 'lucide-react'
+import { CalendarClock, ChevronLeft, Plus } from 'lucide-react'
 import { listPlans, activatePlan, archivePlan } from '../lib/plans.ts'
 import type { WorkoutPlan } from '../types/coach.ts'
+
+function formatDatePt(iso: string): string {
+  return new Date(iso).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+}
 
 export default function AllPlansScreen() {
   const navigate = useNavigate()
@@ -67,49 +76,72 @@ export default function AllPlansScreen() {
       <div className="flex flex-col gap-3">
         {plans?.map((plan) => {
           const isActive = plan.status === 'active'
+          const isScheduled = plan.status === 'scheduled'
           return (
             <div
               key={plan.id}
               className={`rounded-2xl border p-4 ${
-                isActive ? 'border-(--color-primary)' : 'border-(--color-border) opacity-80'
+                isActive
+                  ? 'border-(--color-primary)'
+                  : isScheduled
+                    ? 'border-(--color-secondary)'
+                    : 'border-(--color-border) opacity-80'
               }`}
             >
               <span
-                className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
                   isActive
                     ? 'bg-(--color-primary)/15 text-(--color-primary)'
-                    : 'bg-(--color-surface-raised) text-(--color-text-muted)'
+                    : isScheduled
+                      ? 'bg-(--color-secondary)/15 text-(--color-secondary)'
+                      : 'bg-(--color-surface-raised) text-(--color-text-muted)'
                 }`}
               >
-                {isActive ? 'Ativo' : 'Arquivado'}
+                {isScheduled && <CalendarClock size={11} />}
+                {isActive ? 'Ativo' : isScheduled ? 'Agendado' : 'Arquivado'}
               </span>
               <div className="mt-2 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate font-bold">{plan.name}</p>
                   <p className="text-xs text-(--color-text-muted)">
+                    {isScheduled && plan.scheduledFor
+                      ? `Começa em ${formatDatePt(plan.scheduledFor)} · `
+                      : ''}
                     {plan.routines.length} rotina{plan.routines.length !== 1 ? 's' : ''}
                     {plan.durationWeeks ? ` · ${plan.durationWeeks} semanas` : ''}
                     {plan.deload ? ' · deload' : ''}
                     {plan.linearPeriodization ? ' · periodização' : ''}
                   </p>
                 </div>
-                {!isActive ? (
-                  <button
-                    onClick={() => handleActivate(plan.id)}
-                    disabled={busyId === plan.id}
-                    className="shrink-0 rounded-full bg-(--color-primary)/10 px-3.5 py-2 text-xs font-semibold text-(--color-primary) disabled:opacity-60"
-                  >
-                    {busyId === plan.id ? '...' : 'Reativar'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleArchive(plan.id)}
-                    disabled={busyId === plan.id}
-                    className="shrink-0 rounded-full bg-(--color-surface-raised) px-3.5 py-2 text-xs font-semibold text-(--color-text-muted) disabled:opacity-60"
-                  >
-                    {busyId === plan.id ? '...' : 'Arquivar'}
-                  </button>
-                )}
+                <div className="flex shrink-0 gap-2">
+                  {isScheduled && (
+                    <button
+                      onClick={() => handleArchive(plan.id)}
+                      disabled={busyId === plan.id}
+                      className="rounded-full bg-(--color-surface-raised) px-3.5 py-2 text-xs font-semibold text-(--color-text-muted) disabled:opacity-60"
+                    >
+                      {busyId === plan.id ? '...' : 'Cancelar'}
+                    </button>
+                  )}
+                  {!isActive && (
+                    <button
+                      onClick={() => handleActivate(plan.id)}
+                      disabled={busyId === plan.id}
+                      className="rounded-full bg-(--color-primary)/10 px-3.5 py-2 text-xs font-semibold text-(--color-primary) disabled:opacity-60"
+                    >
+                      {busyId === plan.id ? '...' : isScheduled ? 'Ativar agora' : 'Reativar'}
+                    </button>
+                  )}
+                  {isActive && (
+                    <button
+                      onClick={() => handleArchive(plan.id)}
+                      disabled={busyId === plan.id}
+                      className="rounded-full bg-(--color-surface-raised) px-3.5 py-2 text-xs font-semibold text-(--color-text-muted) disabled:opacity-60"
+                    >
+                      {busyId === plan.id ? '...' : 'Arquivar'}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )
@@ -118,8 +150,8 @@ export default function AllPlansScreen() {
 
       {plans && plans.length > 0 && (
         <p className="mt-5 text-xs leading-relaxed text-(--color-text-muted)">
-          Reativar um plano arquivado arquiva automaticamente o que estava ativo — só um por
-          vez, mas nada se perde.
+          Reativar um plano arquivado (ou agendado) arquiva automaticamente o que estava
+          ativo — só um por vez, mas nada se perde.
         </p>
       )}
     </div>
