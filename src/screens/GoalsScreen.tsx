@@ -27,7 +27,12 @@ export default function GoalsScreen() {
         <h1 className="text-xl font-bold leading-tight">Seus objetivos</h1>
       </header>
 
-      <GoalsForm initial={goals} submitLabel="Salvar" onSaved={() => navigate('/')} />
+      <GoalsForm
+        initial={goals}
+        submitLabel="Salvar"
+        onSaved={() => navigate('/')}
+        equipmentMode="link"
+      />
 
       <BottomTabBar />
     </div>

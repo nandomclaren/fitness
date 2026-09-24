@@ -313,8 +313,9 @@ depender de memória de conversa.
   faltava o jeito de criar plano fora do chat do coach e a gestão de vários planos. Ver
   decisões sobre deload/periodização e consolidação de split abaixo.
 Prioridade combinada em 24/09/2026 pros itens ainda abertos, pra depois de fechar a
-biblioteca de exercícios (em discussão): **1º Gestão de equipamento → 2º Notificação
-OS-level → 3º Aba Coach → 4º Streaks**. Os números `[Nº]` abaixo marcam essa ordem.
+biblioteca de exercícios (em discussão): 1º Gestão de equipamento (✅ concluído) → **2º
+Notificação OS-level → 3º Aba Coach → 4º Streaks**. Os números `[Nº]` abaixo marcam essa
+ordem.
 
 - [ ] `[4º]` **Streaks/gamificação** (dias seguidos, contagem de treinos) — não iniciado.
 - [~] **Biblioteca de exercícios com vídeo/instruções passo-a-passo** (em discussão em
@@ -325,8 +326,9 @@ OS-level → 3º Aba Coach → 4º Streaks**. Os números `[Nº]` abaixo marcam 
   daqui pra frente. Ver decisão detalhada sobre ingestão/cota abaixo.
 - [ ] `[2º]` **Notificação OS-level "descanso concluído"** — gap real, nunca implementado. Ver
   decisão sobre Live Activity/AOD abaixo (bloqueado por infra nativa).
-- [ ] `[1º]` **Gestão de equipamento ("My gym") como tela dedicada** — hoje só existe dentro do
-  onboarding; Alpha permite editar a qualquer momento.
+- [x] **Gestão de equipamento como tela dedicada** (concluído em 24/09/2026) — antes só dava
+  pra editar equipamento dentro do fluxo de onboarding. Ver prints do "My gym" do Alpha
+  (`design-reference/`) e decisão de escopo abaixo.
 - [ ] `[3º]` **Aba "Coach" conversacional pra discutir evolução** (pedido em 24/09/2026, roadmap —
   explicitamente não é pra agora). O mesmo coach que monta as rotinas e conhece o histórico
   do usuário deve conseguir bater papo tipo "consulta com o personal": responder perguntas
@@ -470,6 +472,23 @@ OS-level → 3º Aba Coach → 4º Streaks**. Os números `[Nº]` abaixo marcam 
   RapidAPI, data exata desconhecida) ou o usuário decide pagar o upgrade, a ingestão de
   novos GIFs fica pausada — não bloqueia o app, que já funciona com o catálogo atual
   (sobretudo os exercícios de dumbbell, que são os que o usuário realmente usa).
+- **Gestão de equipamento: escopo mínimo (tela separada), não o "My gym" completo do
+  Alpha.** Perguntado o quanto valia a pena portar dos prints do Alpha (grid categorizado
+  com ícones, contador de exercícios compatíveis ao vivo, seção "Weights" pra cadastrar
+  anilhas/halteres específicos, múltiplos "gyms" nomeados) — usuário escolheu o essencial:
+  só tirar o equipamento de dentro do formulário de onboarding/Ajustes e virar uma tela
+  própria (`EquipmentScreen`, rota `/equipamento`), sem grid visual nem inventário de
+  cargas. Implementado sem duplicar UI: `EquipmentPicker` (`src/components/`) é a mesma
+  grade de toggles usada em dois lugares — inline no onboarding (`GoalsForm` com
+  `equipmentMode="inline"`, já que no primeiro acesso não existe nada prévio pra "editar
+  depois") e dentro da tela dedicada (chamada a partir de Ajustes via
+  `equipmentMode="link"`, que troca a grade por uma linha-resumo com as opções já marcadas
+  + seta, clicável). Como `PUT /goals` exige o objeto inteiro (não é PATCH parcial),
+  `EquipmentScreen` busca o registro atual e reenvia tudo de volta trocando só o campo
+  `equipment` — os outros campos (objetivo/nível/dias/limitações) nunca são tocados por
+  essa tela. A ideia do inventário de cargas específicas (ligaria direto com
+  `suggestNextLoad`/dupla progressão) ficou anotada como possível next step, não descartada
+  — só fora do escopo desta rodada.
 - **Correção de série já registrada precisa de round-trip ao backend** —
   `PATCH /sessions/:id/sets/:setId` (`server/routes/sessions.ts`), reaproveitando a mesma
   lógica de recálculo de recorde pessoal do POST (extraída pra `maybeUpdatePR`). Editar um

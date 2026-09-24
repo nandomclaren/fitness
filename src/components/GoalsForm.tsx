@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Info } from 'lucide-react'
+import { ChevronRight, Info } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import {
   EQUIPMENT_OPTIONS,
   LEVEL_LABELS,
@@ -10,6 +11,7 @@ import {
   type UserGoals,
 } from '../types/goals.ts'
 import { saveGoals } from '../lib/goals.ts'
+import EquipmentPicker from './EquipmentPicker.tsx'
 
 const OBJECTIVES = Object.keys(OBJECTIVE_LABELS) as Objective[]
 const LEVELS = Object.keys(LEVEL_LABELS) as ExperienceLevel[]
@@ -18,9 +20,15 @@ interface GoalsFormProps {
   initial: UserGoals | null
   submitLabel: string
   onSaved: () => void
+  /** 'inline' (padrão) mostra os toggles de equipamento aqui mesmo — usado no onboarding,
+   * onde ainda não existe nada cadastrado pra editar depois. 'link' mostra só um resumo com
+   * atalho pra tela dedicada `/equipamento` — usado em Ajustes, onde o equipamento já pode
+   * ser editado a qualquer momento fora desse formulário. */
+  equipmentMode?: 'inline' | 'link'
 }
 
-export default function GoalsForm({ initial, submitLabel, onSaved }: GoalsFormProps) {
+export default function GoalsForm({ initial, submitLabel, onSaved, equipmentMode = 'inline' }: GoalsFormProps) {
+  const navigate = useNavigate()
   const [objective, setObjective] = useState<Objective>(initial?.objective ?? 'hipertrofia')
   const [level, setLevel] = useState<ExperienceLevel>(initial?.level ?? 'iniciante')
   const [daysPerWeek, setDaysPerWeek] = useState(initial?.daysPerWeek ?? 3)
@@ -137,22 +145,24 @@ export default function GoalsForm({ initial, submitLabel, onSaved }: GoalsFormPr
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-(--color-text-muted)">
           Equipamentos disponíveis
         </h2>
-        <div className="flex flex-wrap gap-2">
-          {EQUIPMENT_OPTIONS.map((eq) => (
-            <button
-              type="button"
-              key={eq.id}
-              onClick={() => toggleEquipment(eq.id)}
-              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                equipment.has(eq.id)
-                  ? 'border-(--color-primary) bg-(--color-primary)/15 text-(--color-primary)'
-                  : 'border-(--color-border) bg-(--color-surface) text-(--color-text-muted) hover:bg-(--color-surface-raised)'
-              }`}
-            >
-              {eq.label}
-            </button>
-          ))}
-        </div>
+        {equipmentMode === 'inline' ? (
+          <EquipmentPicker value={equipment} onToggle={toggleEquipment} />
+        ) : (
+          <button
+            type="button"
+            onClick={() => navigate('/equipamento')}
+            className="flex w-full items-center justify-between gap-2 rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3 text-left hover:bg-(--color-surface-raised)"
+          >
+            <span className="min-w-0 flex-1 truncate text-sm text-(--color-text-muted)">
+              {equipment.size > 0
+                ? EQUIPMENT_OPTIONS.filter((eq) => equipment.has(eq.id))
+                    .map((eq) => eq.label)
+                    .join(', ')
+                : 'Nenhum selecionado'}
+            </span>
+            <ChevronRight size={18} className="shrink-0 text-(--color-text-muted)" />
+          </button>
+        )}
       </section>
 
       <section>
