@@ -73,13 +73,18 @@ model WorkoutPlan {
   name          String
   rationale     String
   durationWeeks Int?
-  status        String        @default("proposed") // proposed | active | archived
+  status        String        @default("proposed") // proposed | scheduled | active | archived
   /// Insere uma semana de deload (menos série, RIR alvo mais alto) a cada 4 semanas do
   /// plano — opcional, escolhido na criação.
   deload        Boolean       @default(false)
   /// Desliza a faixa de reps prescrita da semana 1 (mais reps) até a última semana do
   /// bloco (menos reps) — opcional, escolhido na criação.
   linearPeriodization Boolean @default(false)
+  /// Preenchido só quando status="scheduled": data (meia-noite UTC) em que esse plano deve
+  /// virar ativo sozinho, arquivando o que estiver ativo então. Null pros demais status —
+  /// inclusive depois de ativado, não vira um "histórico de quando começou" (isso já é
+  /// `activatedAt`).
+  scheduledFor  DateTime?
   activatedAt   DateTime?
   createdAt     DateTime      @default(now())
   routines      PlanRoutine[]

@@ -4,6 +4,7 @@ import { prisma } from '../prisma.ts'
 import { compactCatalog, exercises, getExercise } from '../exercises.ts'
 import { describeProgressionTrend, topSetPerSession } from '../progressionTrend.ts'
 import { MUSCLE_LABELS_PT } from '../../src/types/muscle.ts'
+import { activateDueScheduledPlans } from './plans.ts'
 
 export const coachRouter = Router()
 
@@ -29,24 +30,22 @@ const PROPOSE_PLAN_TOOL: Anthropic.Tool = {
       },
       routines: {
         type: 'array',
-        minItems: 1,
-        maxItems: 4,
+        description: 'Entre 1 e 4 rotinas.',
         items: {
           type: 'object',
           properties: {
             label: { type: 'string', description: 'Nome da rotina, ex.: "A", "B", "Superior".' },
             exercises: {
               type: 'array',
-              minItems: 2,
-              maxItems: 10,
+              description: 'Entre 2 e 10 exercícios por rotina.',
               items: {
                 type: 'object',
                 properties: {
                   exerciseId: { type: 'string', description: 'ID do catálogo fornecido.' },
-                  sets: { type: 'integer', minimum: 1, maximum: 6 },
-                  repRangeMin: { type: 'integer', minimum: 1, maximum: 30 },
-                  repRangeMax: { type: 'integer', minimum: 1, maximum: 30 },
-                  restSeconds: { type: 'integer', minimum: 15, maximum: 240 },
+                  sets: { type: 'integer', description: 'Entre 1 e 6.' },
+                  repRangeMin: { type: 'integer', description: 'Entre 1 e 30.' },
+                  repRangeMax: { type: 'integer', description: 'Entre 1 e 30, maior ou igual a repRangeMin.' },
+                  restSeconds: { type: 'integer', description: 'Entre 15 e 240.' },
                 },
                 required: ['exerciseId', 'sets', 'repRangeMin', 'repRangeMax', 'restSeconds'],
                 additionalProperties: false,
@@ -321,9 +320,28 @@ coachRouter.post('/coach/messages', async (req, res) => {
         }>
       }
 
+      // Schema não valida mais faixa numérica/tamanho de array (a API rejeita
+      // minItems/maxItems/minimum/maximum em tool custom com 400) — vira clamp aqui.
+      const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, Math.round(n)))
       const validIds = new Set(exercises.map((e) => e.id))
       const routinesWithValidExercises = input.routines
-        .map((r) => ({ ...r, exercises: r.exercises.filter((e) => validIds.has(e.exerciseId)) }))
+        .slice(0, 4)
+        .map((r) => ({
+          ...r,
+          exercises: r.exercises
+            .filter((e) => validIds.has(e.exerciseId))
+            .slice(0, 10)
+            .map((e) => {
+              const repRangeMin = clamp(e.repRangeMin, 1, 30)
+              return {
+                ...e,
+                sets: clamp(e.sets, 1, 6),
+                repRangeMin,
+                repRangeMax: clamp(e.repRangeMax, repRangeMin, 30),
+                restSeconds: clamp(e.restSeconds, 15, 240),
+              }
+            }),
+        }))
         .filter((r) => r.exercises.length >= 2)
 
       if (routinesWithValidExercises.length > 0) {
@@ -425,6 +443,7 @@ coachRouter.post('/coach/plans/:id/dismiss', async (req, res) => {
 })
 
 coachRouter.get('/plan/active', async (_req, res) => {
+  await activateDueScheduledPlans()
   const plan = await prisma.workoutPlan.findFirst({
     where: { status: 'active' },
     include: { routines: { include: { exercises: true }, orderBy: { order: 'asc' } } },

@@ -75,8 +75,7 @@ const AI_PLAN_TOOL: Anthropic.Tool = {
       },
       routines: {
         type: 'array',
-        minItems: 1,
-        maxItems: 4,
+        description: 'Entre 1 e 4 rotinas — exatamente a quantidade pedida no prompt.',
         items: {
           type: 'object',
           properties: {
@@ -88,16 +87,15 @@ const AI_PLAN_TOOL: Anthropic.Tool = {
             },
             exercises: {
               type: 'array',
-              minItems: 3,
-              maxItems: 9,
+              description: 'Entre 3 e 9 exercícios por rotina.',
               items: {
                 type: 'object',
                 properties: {
                   exerciseId: { type: 'string' },
-                  sets: { type: 'integer', minimum: 1, maximum: 6 },
-                  repRangeMin: { type: 'integer', minimum: 1, maximum: 30 },
-                  repRangeMax: { type: 'integer', minimum: 1, maximum: 30 },
-                  restSeconds: { type: 'integer', minimum: 15, maximum: 240 },
+                  sets: { type: 'integer', description: 'Entre 1 e 6.' },
+                  repRangeMin: { type: 'integer', description: 'Entre 1 e 30.' },
+                  repRangeMax: { type: 'integer', description: 'Entre 1 e 30, maior ou igual a repRangeMin.' },
+                  restSeconds: { type: 'integer', description: 'Entre 15 e 240.' },
                 },
                 required: ['exerciseId', 'sets', 'repRangeMin', 'repRangeMax', 'restSeconds'],
                 additionalProperties: false,
@@ -287,9 +285,30 @@ async function generateWithAi(
   }
   const input = toolUse.input as { name: string; rationale: string; routines: PlanRoutineData[] }
 
+  // O schema da tool não consegue mais validar faixas numéricas/tamanho de array (a API
+  // rejeita minItems/maxItems/minimum/maximum em tool custom com 400 — só ficaram como
+  // texto na description), então esses limites viram clamp aqui em vez de garantia do
+  // schema.
+  const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, Math.round(n)))
   const validIds = new Set(exercises.map((e) => e.id))
   const routines = input.routines
-    .map((r) => ({ ...r, exercises: r.exercises.filter((e) => validIds.has(e.exerciseId)) }))
+    .slice(0, 4)
+    .map((r) => ({
+      ...r,
+      exercises: r.exercises
+        .filter((e) => validIds.has(e.exerciseId))
+        .slice(0, 9)
+        .map((e) => {
+          const repRangeMin = clamp(e.repRangeMin, 1, 30)
+          return {
+            ...e,
+            sets: clamp(e.sets, 1, 6),
+            repRangeMin,
+            repRangeMax: clamp(e.repRangeMax, repRangeMin, 30),
+            restSeconds: clamp(e.restSeconds, 15, 240),
+          }
+        }),
+    }))
     .filter((r) => r.exercises.length >= 2)
 
   if (routines.length === 0) throw new Error('IA não retornou exercícios válidos')
@@ -297,13 +316,39 @@ async function generateWithAi(
   return { name: input.name, rationale: input.rationale, routines }
 }
 
+/**
+ * Ativa sozinho qualquer plano "scheduled" cuja data já chegou — sem worker/cron dedicado,
+ * então roda sob demanda (chamada no início das rotas que listam/consultam planos) em vez
+ * de um agendador de verdade, suficiente pra um app de uso pessoal onde o usuário abre o
+ * app com frequência. Se mais de um plano agendado já estiver vencido (usuário ficou
+ * sumido um tempo), processa em ordem cronológica — o de data mais recente entre os
+ * vencidos acaba sendo o que fica ativo no final, que é o comportamento certo.
+ */
+export async function activateDueScheduledPlans(): Promise<void> {
+  const due = await prisma.workoutPlan.findMany({
+    where: { status: 'scheduled', scheduledFor: { lte: new Date() } },
+    orderBy: { scheduledFor: 'asc' },
+  })
+  for (const plan of due) {
+    await prisma.$transaction([
+      prisma.workoutPlan.updateMany({ where: { status: 'active' }, data: { status: 'archived' } }),
+      prisma.workoutPlan.update({
+        where: { id: plan.id },
+        data: { status: 'active', activatedAt: new Date() },
+      }),
+    ])
+  }
+}
+
 plansRouter.get('/plans', async (_req, res) => {
+  await activateDueScheduledPlans()
   const plans = await prisma.workoutPlan.findMany({
-    where: { status: { in: ['active', 'archived'] } },
+    where: { status: { in: ['scheduled', 'active', 'archived'] } },
     include: { routines: { include: { exercises: true }, orderBy: { order: 'asc' } } },
     orderBy: { createdAt: 'desc' },
   })
-  plans.sort((a, b) => (a.status === 'active' ? -1 : b.status === 'active' ? 1 : 0))
+  const statusOrder: Record<string, number> = { active: 0, scheduled: 1, archived: 2 }
+  plans.sort((a, b) => statusOrder[a.status] - statusOrder[b.status])
   res.json(plans)
 })
 
@@ -324,8 +369,11 @@ plansRouter.post('/plans/:id/activate', async (req, res) => {
 
 plansRouter.post('/plans/:id/archive', async (req, res) => {
   const plan = await prisma.workoutPlan.findUnique({ where: { id: req.params.id } })
-  if (!plan || plan.status !== 'active') {
-    res.status(404).json({ error: 'plano não encontrado ou não está ativo' })
+  // Também serve pra cancelar um plano "scheduled" antes da data chegar — arquivar um
+  // agendamento futuro é conceitualmente o mesmo gesto que arquivar um ativo (o resto do
+  // app só se importa com "não é isso que vale agora").
+  if (!plan || (plan.status !== 'active' && plan.status !== 'scheduled')) {
+    res.status(404).json({ error: 'plano não encontrado, ou não está ativo nem agendado' })
     return
   }
   await prisma.workoutPlan.update({ where: { id: plan.id }, data: { status: 'archived' } })
@@ -333,19 +381,31 @@ plansRouter.post('/plans/:id/archive', async (req, res) => {
 })
 
 plansRouter.post('/plans', async (req, res) => {
-  const { mode, name, numRoutines, durationWeeks, deload, linearPeriodization } = req.body as {
+  const { mode, name, numRoutines, durationWeeks, deload, linearPeriodization, startDate } = req.body as {
     mode: 'rule' | 'ai'
     name?: string
     numRoutines: number
     durationWeeks: number
     deload: boolean
     linearPeriodization: boolean
+    /** "YYYY-MM-DD" — data em que o usuário quer que o plano comece. Omitido ou hoje =
+     * ativa na hora (comportamento de sempre); data futura = fica "scheduled" até lá. */
+    startDate?: string
   }
 
   if (!numRoutines || numRoutines < 1 || numRoutines > 4) {
     res.status(400).json({ error: 'numRoutines deve ser entre 1 e 4' })
     return
   }
+
+  const todayStr = new Date().toISOString().slice(0, 10)
+  if (startDate && startDate < todayStr) {
+    res.status(400).json({ error: 'startDate não pode ser no passado' })
+    return
+  }
+  const isFutureStart = !!startDate && startDate > todayStr
+
+  await activateDueScheduledPlans()
 
   const goalsRow = await prisma.userGoals.findUnique({ where: { id: 'me' } })
   const goals = goalsRow as UserGoals | null
@@ -377,29 +437,41 @@ plansRouter.post('/plans', async (req, res) => {
       'Rotina balanceada padrão (regra fixa ACSM/NSCA), um exercício-âncora por grupo muscular do split.'
   }
 
-  const [, plan] = await prisma.$transaction([
-    prisma.workoutPlan.updateMany({ where: { status: 'active' }, data: { status: 'archived' } }),
-    prisma.workoutPlan.create({
-      data: {
-        name: planName,
-        rationale,
-        durationWeeks,
-        status: 'active',
-        activatedAt: new Date(),
-        deload: !!deload,
-        linearPeriodization: !!linearPeriodization,
-        routines: {
-          create: routinesData.map((r, i) => ({
-            label: r.label,
-            order: i,
-            rationale: r.rationale,
-            exercises: { create: r.exercises.map((e, j) => ({ ...e, order: j })) },
-          })),
-        },
-      },
+  const baseData = {
+    name: planName,
+    rationale,
+    durationWeeks,
+    deload: !!deload,
+    linearPeriodization: !!linearPeriodization,
+    routines: {
+      create: routinesData.map((r, i) => ({
+        label: r.label,
+        order: i,
+        rationale: r.rationale,
+        exercises: { create: r.exercises.map((e, j) => ({ ...e, order: j })) },
+      })),
+    },
+  }
+
+  let plan
+  if (isFutureStart) {
+    // Data futura: cria "scheduled" e não mexe no plano ativo atual — ele continua
+    // valendo até a data chegar (ver activateDueScheduledPlans) ou outro plano ser
+    // ativado manualmente antes disso.
+    plan = await prisma.workoutPlan.create({
+      data: { ...baseData, status: 'scheduled', scheduledFor: new Date(`${startDate}T00:00:00Z`) },
       include: { routines: { include: { exercises: true } } },
-    }),
-  ])
+    })
+  } else {
+    const [, created] = await prisma.$transaction([
+      prisma.workoutPlan.updateMany({ where: { status: 'active' }, data: { status: 'archived' } }),
+      prisma.workoutPlan.create({
+        data: { ...baseData, status: 'active', activatedAt: new Date() },
+        include: { routines: { include: { exercises: true } } },
+      }),
+    ])
+    plan = created
+  }
 
   res.json(plan)
 })
