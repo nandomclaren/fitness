@@ -30,19 +30,24 @@ export default function HistoryScreen() {
       </header>
 
       {streak && streak.totalWorkouts > 0 && (
-        <div className="mb-6 grid grid-cols-3 gap-2">
+        <div className="mb-6 grid grid-cols-2 gap-2">
           <div className="flex flex-col items-center gap-1 rounded-xl border border-(--color-border) bg-(--color-surface) py-3">
             <Flame size={18} className="text-(--color-secondary)" />
             <span className="text-lg font-bold">{streak.currentStreak}</span>
-            <span className="text-[11px] text-(--color-text-muted)">dias seguidos</span>
+            <span className="text-[11px] text-(--color-text-muted)">semanas seguidas</span>
           </div>
           <div className="flex flex-col items-center gap-1 rounded-xl border border-(--color-border) bg-(--color-surface) py-3">
             <Trophy size={18} className="text-(--color-secondary)" />
             <span className="text-lg font-bold">{streak.longestStreak}</span>
-            <span className="text-[11px] text-(--color-text-muted)">recorde de dias</span>
+            <span className="text-[11px] text-(--color-text-muted)">recorde de semanas</span>
           </div>
           <div className="flex flex-col items-center gap-1 rounded-xl border border-(--color-border) bg-(--color-surface) py-3">
-            <Dumbbell size={18} className="text-(--color-secondary)" />
+            <Flame size={18} className="text-(--color-text-muted)" />
+            <span className="text-lg font-bold">{streak.currentDailyStreak}</span>
+            <span className="text-[11px] text-(--color-text-muted)">dias seguidos</span>
+          </div>
+          <div className="flex flex-col items-center gap-1 rounded-xl border border-(--color-border) bg-(--color-surface) py-3">
+            <Dumbbell size={18} className="text-(--color-text-muted)" />
             <span className="text-lg font-bold">{streak.totalWorkouts}</span>
             <span className="text-[11px] text-(--color-text-muted)">treinos no total</span>
           </div>

@@ -530,19 +530,32 @@ concluído) → 4º Streaks (✅ concluído — fecha essa rodada de priorizaç�
   neste ambiente, então só validando a montagem do contexto antes da chamada falhar): o
   resumo de tendência saiu correto a partir de sessões simuladas (supino evoluindo,
   elevação lateral estagnada, press caindo).
-- **Streak é por dia calendário (UTC), não por dia de treino agendado.** `GET /streak`
-  (`server/routes/sessions.ts`) pega a data (`startedAt.toISOString().slice(0,10)`, mesma
-  convenção já usada pro histórico do coach) de toda sessão concluída, deduplica por dia e
-  conta sequências consecutivas — qualquer dia com pelo menos 1 treino conta o dia inteiro,
-  não importa quantos treinos teve nele. Streak "atual" fica vivo se o último treino foi
-  hoje OU ontem (senão já quebrou); sem timezone do usuário guardado em lugar nenhum do
-  schema, aceitável um desvio de 1-2h perto da meia-noite pra um app de uso pessoal — não
-  vale adicionar campo novo só pra isso agora. `StreakBadge` (chama + número) fica no
-  header da Home, silencioso (não renderiza) até o primeiro treino concluído pra não achar
-  "0 dias" chato pra quem tá começando; o Histórico ganhou um card com os 3 números (atual,
-  recorde, total) pra quem quiser ver o "placar" completo. Testado com 4 sessões reais
-  (3 num dia, 1 no dia anterior): `{"currentStreak":2,"longestStreak":2,"totalWorkouts":4}` —
-  bate exatamente com o esperado.
+- **Streak PRINCIPAL é semanal, não diário — corrigido depois de conferir o Alpha
+  Progression de perto.** Primeira versão media dias seguidos (estilo Duolingo). O usuário
+  reparou, olhando prints do Alpha, que o "🔥 Xw" em destaque lá (tela pós-treino e perfil)
+  é streak de SEMANAS com pelo menos 1 treino, não de dias — só ao abrir o detalhe é que
+  aparece o streak diário como métrica secundária, junto de um "Target: 1 per week"
+  configurável. Faz mais sentido pra um app de treino: um dia de descanso normal não
+  deveria "quebrar" nada, só uma semana inteira sem pisar na academia. `GET /streak`
+  (`server/routes/sessions.ts`) agora calcula os dois: `computeStreaks` é genérico (recebe
+  os timestamps já alinhados ao período — dia ou semana — e o tamanho do passo) e é chamado
+  uma vez por dia (`stepMs = 1 dia`) e uma vez por semana (`stepMs = 7 dias`, semana
+  começando domingo — mesma convenção do `WeekStrip` do frontend). "Streak atual" fica vivo
+  comparando o último timestamp contra o início do período corrente OU do anterior
+  (hoje/ontem pro diário; essa semana/semana passada pro semanal) — comparação exata de
+  timestamp, não "quantas horas se passaram", que erra dependendo da hora do dia em que o
+  cálculo roda. `currentStreak`/`longestStreak` no response são os SEMANAIS (o que
+  `StreakBadge` mostra, "🔥 Xw"); `currentDailyStreak`/`longestDailyStreak` são os diários,
+  mostrados como métrica secundária no card do Histórico (2x2: semanas atual/recorde, dias
+  atual, total). Sem timezone do usuário guardado no schema, o desvio de 1-2h perto da
+  virada de dia/semana é aceitável pra um app de uso pessoal. Testado com 4 sessões reais
+  (3 numa quinta, 1 na quarta anterior, mesma semana):
+  `{"currentStreak":1,"longestStreak":1,"currentDailyStreak":2,"longestDailyStreak":2,"totalWorkouts":4}`
+  — 1 semana (as duas datas caem na mesma semana), 2 dias seguidos, bate exatamente com o
+  esperado. Estrelas/pontuação por treino e conquistas (badges tipo "Rookie", "Never Skip
+  Leg Day") que aparecem nos mesmos prints do Alpha NÃO foram implementados — não faziam
+  parte do escopo combinado ("streaks/gamificação: dias seguidos, contagem de treinos"), e
+  o usuário confirmou que era só curiosidade, não pedido.
 - **Correção de série já registrada precisa de round-trip ao backend** —
   `PATCH /sessions/:id/sets/:setId` (`server/routes/sessions.ts`), reaproveitando a mesma
   lógica de recálculo de recorde pessoal do POST (extraída pra `maybeUpdatePR`). Editar um

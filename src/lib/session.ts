@@ -80,8 +80,14 @@ export async function listSessions(): Promise<SessionListItem[]> {
 }
 
 export interface StreakStats {
+  /** Streak PRINCIPAL — semanas seguidas com pelo menos 1 treino (mesmo mecanismo do
+   * Alpha Progression: um dia de descanso não quebra nada, só uma semana inteira sem
+   * treinar). */
   currentStreak: number
   longestStreak: number
+  /** Streak diário — métrica secundária, exibida como detalhe. */
+  currentDailyStreak: number
+  longestDailyStreak: number
   totalWorkouts: number
 }
 

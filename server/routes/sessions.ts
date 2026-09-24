@@ -219,13 +219,51 @@ sessionsRouter.get('/sessions/:id/summary', async (req, res) => {
   })
 })
 
+const DAY_MS = 86_400_000
+const WEEK_MS = 7 * DAY_MS
+
+/** Conta a maior sequência de itens consecutivos (dias ou semanas, ambos como timestamps
+ * já alinhados a um múltiplo de `stepMs`) e devolve também a sequência "atual" (a que
+ * termina no item mais recente) — zerada se o item mais recente não for nem o período
+ * corrente nem o imediatamente anterior (`currentPeriodStart`/`previousPeriodStart`; ex.:
+ * streak de dias fica vivo treinando hoje OU ontem; de semanas, essa semana OU a passada).
+ * Comparar por início-de-período exato em vez de "há quanto tempo" evita contar errado
+ * conforme a hora do dia em que o cálculo roda. */
+function computeStreaks(
+  sortedTimestamps: number[],
+  stepMs: number,
+  currentPeriodStart: number,
+  previousPeriodStart: number,
+): { current: number; longest: number } {
+  if (sortedTimestamps.length === 0) return { current: 0, longest: 0 }
+
+  let longest = 1
+  let run = 1
+  for (let i = 1; i < sortedTimestamps.length; i++) {
+    run = sortedTimestamps[i] - sortedTimestamps[i - 1] === stepMs ? run + 1 : 1
+    longest = Math.max(longest, run)
+  }
+
+  const last = sortedTimestamps[sortedTimestamps.length - 1]
+  if (last !== currentPeriodStart && last !== previousPeriodStart) return { current: 0, longest }
+
+  let current = 1
+  for (let i = sortedTimestamps.length - 1; i > 0; i--) {
+    if (sortedTimestamps[i] - sortedTimestamps[i - 1] === stepMs) current += 1
+    else break
+  }
+  return { current, longest }
+}
+
 /**
- * Streak (dias seguidos) + contagem total de treinos. Dia é a data de `startedAt` em UTC
- * (mesma convenção já usada em `coach.ts` pro histórico da conversa) — sem timezone do
- * usuário guardado em lugar nenhum, então não dá pra fazer melhor sem adicionar isso ao
- * schema; pra um app de uso pessoal, o desvio de "virou o dia 1-2h errado perto da
- * meia-noite" é aceitável. Um único treino no dia já conta o dia inteiro pro streak,
- * mesmo com mais de um treino na mesma data.
+ * Streak diário + semanal + contagem total de treinos. "Semanal" é o streak principal
+ * mostrado no app (bate com o Alpha Progression, que usa o mesmo mecanismo: o "🔥 Xw"
+ * mostrado em destaque é streak de SEMANAS com pelo menos 1 treino, não de dias — faz mais
+ * sentido pra um app de treino, já que um dia de descanso não deveria "quebrar" nada).
+ * Diário fica como métrica secundária. Dia/semana usam `startedAt` em UTC (mesma convenção
+ * já usada em `coach.ts` pro histórico da conversa) — sem timezone do usuário guardado no
+ * schema, o desvio de "virou o dia/semana 1-2h errado perto da virada" é aceitável pra um
+ * app de uso pessoal. Semana começa no domingo, mesma convenção do `WeekStrip` do frontend.
  */
 sessionsRouter.get('/streak', async (_req, res) => {
   const sessions = await prisma.workoutSession.findMany({
@@ -235,35 +273,34 @@ sessionsRouter.get('/streak', async (_req, res) => {
   })
 
   const totalWorkouts = sessions.length
-  const days = [...new Set(sessions.map((s) => s.startedAt.toISOString().slice(0, 10)))].sort()
 
-  let longestStreak = 0
-  let currentStreak = 0
+  const dayTimestamps = [
+    ...new Set(sessions.map((s) => new Date(s.startedAt.toISOString().slice(0, 10) + 'T00:00:00Z').getTime())),
+  ].sort((a, b) => a - b)
 
-  if (days.length > 0) {
-    let run = 1
-    longestStreak = 1
-    for (let i = 1; i < days.length; i++) {
-      const prev = new Date(`${days[i - 1]}T00:00:00Z`).getTime()
-      const cur = new Date(`${days[i]}T00:00:00Z`).getTime()
-      run = cur - prev === 86_400_000 ? run + 1 : 1
-      longestStreak = Math.max(longestStreak, run)
-    }
+  const weekTimestamps = [
+    ...new Set(
+      sessions.map((s) => {
+        const d = new Date(s.startedAt.toISOString().slice(0, 10) + 'T00:00:00Z')
+        const sundayOffset = d.getUTCDay() * DAY_MS
+        return d.getTime() - sundayOffset
+      }),
+    ),
+  ].sort((a, b) => a - b)
 
-    const todayStr = new Date().toISOString().slice(0, 10)
-    const yesterdayStr = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
-    const lastDay = days[days.length - 1]
-    // Treinou hoje ou ontem: streak "viva". Se o último treino foi antes de ontem, quebrou.
-    if (lastDay === todayStr || lastDay === yesterdayStr) {
-      currentStreak = 1
-      for (let i = days.length - 1; i > 0; i--) {
-        const prev = new Date(`${days[i - 1]}T00:00:00Z`).getTime()
-        const cur = new Date(`${days[i]}T00:00:00Z`).getTime()
-        if (cur - prev === 86_400_000) currentStreak += 1
-        else break
-      }
-    }
-  }
+  const todayStart = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z').getTime()
+  const yesterdayStart = todayStart - DAY_MS
+  const thisWeekStart = todayStart - new Date(todayStart).getUTCDay() * DAY_MS
+  const lastWeekStart = thisWeekStart - WEEK_MS
 
-  res.json({ currentStreak, longestStreak, totalWorkouts })
+  const daily = computeStreaks(dayTimestamps, DAY_MS, todayStart, yesterdayStart)
+  const weekly = computeStreaks(weekTimestamps, WEEK_MS, thisWeekStart, lastWeekStart)
+
+  res.json({
+    currentStreak: weekly.current,
+    longestStreak: weekly.longest,
+    currentDailyStreak: daily.current,
+    longestDailyStreak: daily.longest,
+    totalWorkouts,
+  })
 })
