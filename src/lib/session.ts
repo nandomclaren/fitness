@@ -78,3 +78,13 @@ export interface SessionListItem {
 export async function listSessions(): Promise<SessionListItem[]> {
   return api.get<SessionListItem[]>('/sessions')
 }
+
+export interface StreakStats {
+  currentStreak: number
+  longestStreak: number
+  totalWorkouts: number
+}
+
+export async function getStreak(): Promise<StreakStats> {
+  return api.get<StreakStats>('/streak')
+}

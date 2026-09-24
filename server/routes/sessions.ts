@@ -218,3 +218,52 @@ sessionsRouter.get('/sessions/:id/summary', async (req, res) => {
     muscleLoad,
   })
 })
+
+/**
+ * Streak (dias seguidos) + contagem total de treinos. Dia é a data de `startedAt` em UTC
+ * (mesma convenção já usada em `coach.ts` pro histórico da conversa) — sem timezone do
+ * usuário guardado em lugar nenhum, então não dá pra fazer melhor sem adicionar isso ao
+ * schema; pra um app de uso pessoal, o desvio de "virou o dia 1-2h errado perto da
+ * meia-noite" é aceitável. Um único treino no dia já conta o dia inteiro pro streak,
+ * mesmo com mais de um treino na mesma data.
+ */
+sessionsRouter.get('/streak', async (_req, res) => {
+  const sessions = await prisma.workoutSession.findMany({
+    where: { finishedAt: { not: null } },
+    select: { startedAt: true },
+    orderBy: { startedAt: 'asc' },
+  })
+
+  const totalWorkouts = sessions.length
+  const days = [...new Set(sessions.map((s) => s.startedAt.toISOString().slice(0, 10)))].sort()
+
+  let longestStreak = 0
+  let currentStreak = 0
+
+  if (days.length > 0) {
+    let run = 1
+    longestStreak = 1
+    for (let i = 1; i < days.length; i++) {
+      const prev = new Date(`${days[i - 1]}T00:00:00Z`).getTime()
+      const cur = new Date(`${days[i]}T00:00:00Z`).getTime()
+      run = cur - prev === 86_400_000 ? run + 1 : 1
+      longestStreak = Math.max(longestStreak, run)
+    }
+
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const yesterdayStr = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+    const lastDay = days[days.length - 1]
+    // Treinou hoje ou ontem: streak "viva". Se o último treino foi antes de ontem, quebrou.
+    if (lastDay === todayStr || lastDay === yesterdayStr) {
+      currentStreak = 1
+      for (let i = days.length - 1; i > 0; i--) {
+        const prev = new Date(`${days[i - 1]}T00:00:00Z`).getTime()
+        const cur = new Date(`${days[i]}T00:00:00Z`).getTime()
+        if (cur - prev === 86_400_000) currentStreak += 1
+        else break
+      }
+    }
+  }
+
+  res.json({ currentStreak, longestStreak, totalWorkouts })
+})

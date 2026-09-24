@@ -315,9 +315,10 @@ depender de memória de conversa.
 Prioridade combinada em 24/09/2026 pros itens ainda abertos, pra depois de fechar a
 biblioteca de exercícios (em discussão): 1º Gestão de equipamento (✅ concluído) → 2º
 Notificação OS-level (✅ concluído, versão possível sem código nativo) → 3º Aba Coach (✅
-concluído) → **4º Streaks**. Os números `[Nº]` abaixo marcam essa ordem.
+concluído) → 4º Streaks (✅ concluído — fecha essa rodada de priorização).
 
-- [ ] `[4º]` **Streaks/gamificação** (dias seguidos, contagem de treinos) — não iniciado.
+- [x] **Streaks/gamificação** (concluído em 24/09/2026) — dias seguidos treinando (streak
+  atual + recorde) e contagem total de treinos. Ver decisão detalhada abaixo.
 - [~] **Biblioteca de exercícios com vídeo/instruções passo-a-passo** (em discussão em
   24/09/2026) — hoje só temos imagem estática (`ExerciseMedia`); Alpha tem vídeo em loop +
   texto de setup/execução, e o usuário confirmou que não vai produzir vídeo próprio. Decisão
@@ -529,6 +530,19 @@ concluído) → **4º Streaks**. Os números `[Nº]` abaixo marcam essa ordem.
   neste ambiente, então só validando a montagem do contexto antes da chamada falhar): o
   resumo de tendência saiu correto a partir de sessões simuladas (supino evoluindo,
   elevação lateral estagnada, press caindo).
+- **Streak é por dia calendário (UTC), não por dia de treino agendado.** `GET /streak`
+  (`server/routes/sessions.ts`) pega a data (`startedAt.toISOString().slice(0,10)`, mesma
+  convenção já usada pro histórico do coach) de toda sessão concluída, deduplica por dia e
+  conta sequências consecutivas — qualquer dia com pelo menos 1 treino conta o dia inteiro,
+  não importa quantos treinos teve nele. Streak "atual" fica vivo se o último treino foi
+  hoje OU ontem (senão já quebrou); sem timezone do usuário guardado em lugar nenhum do
+  schema, aceitável um desvio de 1-2h perto da meia-noite pra um app de uso pessoal — não
+  vale adicionar campo novo só pra isso agora. `StreakBadge` (chama + número) fica no
+  header da Home, silencioso (não renderiza) até o primeiro treino concluído pra não achar
+  "0 dias" chato pra quem tá começando; o Histórico ganhou um card com os 3 números (atual,
+  recorde, total) pra quem quiser ver o "placar" completo. Testado com 4 sessões reais
+  (3 num dia, 1 no dia anterior): `{"currentStreak":2,"longestStreak":2,"totalWorkouts":4}` —
+  bate exatamente com o esperado.
 - **Correção de série já registrada precisa de round-trip ao backend** —
   `PATCH /sessions/:id/sets/:setId` (`server/routes/sessions.ts`), reaproveitando a mesma
   lógica de recálculo de recorde pessoal do POST (extraída pra `maybeUpdatePR`). Editar um

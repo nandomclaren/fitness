@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Dumbbell } from 'lucide-react'
-import { listSessions, type SessionListItem } from '../lib/session.ts'
+import { ChevronRight, Dumbbell, Flame, Trophy } from 'lucide-react'
+import { listSessions, getStreak, type SessionListItem, type StreakStats } from '../lib/session.ts'
 import { SPLIT_LABELS_PT } from '../lib/routine.ts'
 import BottomTabBar from '../components/BottomTabBar'
 
@@ -16,9 +16,11 @@ function formatDate(iso: string): string {
 export default function HistoryScreen() {
   const navigate = useNavigate()
   const [sessions, setSessions] = useState<SessionListItem[] | null>(null)
+  const [streak, setStreak] = useState<StreakStats | null>(null)
 
   useEffect(() => {
     listSessions().then(setSessions)
+    getStreak().then(setStreak)
   }, [])
 
   return (
@@ -26,6 +28,26 @@ export default function HistoryScreen() {
       <header className="mb-6">
         <h1 className="text-xl font-bold leading-tight">Histórico de treinos</h1>
       </header>
+
+      {streak && streak.totalWorkouts > 0 && (
+        <div className="mb-6 grid grid-cols-3 gap-2">
+          <div className="flex flex-col items-center gap-1 rounded-xl border border-(--color-border) bg-(--color-surface) py-3">
+            <Flame size={18} className="text-(--color-secondary)" />
+            <span className="text-lg font-bold">{streak.currentStreak}</span>
+            <span className="text-[11px] text-(--color-text-muted)">dias seguidos</span>
+          </div>
+          <div className="flex flex-col items-center gap-1 rounded-xl border border-(--color-border) bg-(--color-surface) py-3">
+            <Trophy size={18} className="text-(--color-secondary)" />
+            <span className="text-lg font-bold">{streak.longestStreak}</span>
+            <span className="text-[11px] text-(--color-text-muted)">recorde de dias</span>
+          </div>
+          <div className="flex flex-col items-center gap-1 rounded-xl border border-(--color-border) bg-(--color-surface) py-3">
+            <Dumbbell size={18} className="text-(--color-secondary)" />
+            <span className="text-lg font-bold">{streak.totalWorkouts}</span>
+            <span className="text-[11px] text-(--color-text-muted)">treinos no total</span>
+          </div>
+        </div>
+      )}
 
       {sessions === null && (
         <p className="text-center text-sm text-(--color-text-muted)">Carregando...</p>

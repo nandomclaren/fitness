@@ -22,6 +22,7 @@ import type { WorkoutSplit } from '../types/workout'
 import type { ActiveWorkoutPlan } from '../types/coach.ts'
 import ExercisePicker from '../components/ExercisePicker'
 import WeekStrip from '../components/WeekStrip'
+import StreakBadge from '../components/StreakBadge'
 
 /**
  * Nome curto pra caber nas abas de seleção de rotina — o coach pode nomear rotinas de
@@ -150,6 +151,7 @@ export default function HomeScreen() {
           <h1 className="text-xl font-bold leading-tight">Maromba</h1>
           <p className="text-sm text-(--color-text-muted)">Seu personal trainer digital</p>
         </div>
+        <StreakBadge />
       </header>
 
       {showPlanMode && activePlan && (
