@@ -214,6 +214,9 @@ export default function PlanWizardScreen() {
           {plan.routines.map((r) => (
             <div key={r.id} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
               <p className="mb-2 font-semibold">{r.label}</p>
+              {r.rationale && (
+                <p className="mb-3 text-xs leading-relaxed text-(--color-text-muted)">{r.rationale}</p>
+              )}
               <ul className="flex flex-col gap-1.5 text-sm text-(--color-text-muted)">
                 {r.exercises.map((pe) => {
                   const exercise = getExercise(pe.exerciseId)

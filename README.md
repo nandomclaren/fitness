@@ -319,6 +319,23 @@ depender de memória de conversa.
   decisão sobre Live Activity/AOD abaixo (bloqueado por infra nativa).
 - [ ] **Gestão de equipamento ("My gym") como tela dedicada** — hoje só existe dentro do
   onboarding; Alpha permite editar a qualquer momento.
+- [ ] **Aba "Coach" conversacional pra discutir evolução** (pedido em 24/09/2026, roadmap —
+  explicitamente não é pra agora). O mesmo coach que monta as rotinas e conhece o histórico
+  do usuário deve conseguir bater papo tipo "consulta com o personal": responder perguntas
+  como "estou evoluindo?", "eu deveria comprar anilhas novas?", "você recomenda fita ou
+  barbell pra diversificar o treino?" — analisando dados reais de sessões passadas, não
+  resposta genérica. Já existe `CoachMessage`/chat com tool-use (`server/routes/coach.ts` —
+  hoje só propõe planos); esse recurso amplia esse mesmo coach pra também analisar
+  histórico/progressão quando o usuário pergunta, em vez de só gerar planos novos. Não
+  iniciado.
+- [x] **Qualidade da geração de exercícios/rotinas** (concluído em 24/09/2026) — usuário
+  comparou lado a lado com o Alpha Progression e constatou que a geração de lá pensa como
+  coach de verdade (3 exercícios de ombro cobrindo cabeças anterior/lateral/posterior,
+  variedade deliberada entre rotinas repetidas via grip/variante, nunca rotina duplicada)
+  enquanto o Maromba escolhia só 1 exercício por músculo por prioridade de equipamento, sem
+  qualquer consciência de padrão de treino. Pedido explícito: "a IA deve ser o caminho
+  primário e o prompt deve ser MUITO bem escrito... o fallback deve ser o melhor bem
+  estruturado possível... isso é o coração do aplicativo." Ver decisão detalhada abaixo.
 
 ### Decisões de arquitetura registradas ao longo do caminho
 
@@ -370,6 +387,36 @@ depender de memória de conversa.
   (`updateMany status=active→archived` + o novo vira `active`) usada tanto pra criar plano
   no wizard quanto pra reativar um arquivado (`POST /plans/:id/activate`) — status "core"
   são só `active`/`archived`, nunca removido de verdade.
+- **Geração de rotina: IA é o caminho primário, regra fixa é o fallback bem estruturado —
+  não o caminho principal.** `server/routes/plans.ts` (`generateWithAi`) roda em
+  `claude-opus-5`, `output_config.effort: 'max'`, `max_tokens: 16000`, via
+  `client.messages.stream(...).finalMessage()` (evita timeout de request longa) e
+  `tool_choice` forçado na tool `generate_plan`. O `system` prompt (`buildSystemPrompt`)
+  não é uma linha genérica — codifica regras explícitas de raciocínio de coach: cobertura
+  de deltoide em 3 porções, zero duplicação preguiçosa entre rotinas do mesmo plano,
+  compostos antes de isolados, balanço push/pull somado no plano inteiro (não por rotina),
+  limitação/lesão vira substituição de exercício, e split como guia de ênfase (não lista
+  rígida). Cada rotina ganha um `rationale` próprio (novo campo `PlanRoutine.rationale`,
+  migração `20260924000000_plan_routine_rationale`) explicando a lógica específica daquele
+  dia — exibido na revisão do wizard e na Home (dia selecionado). Se a chamada de IA falhar
+  por qualquer motivo (sem chave, rate limit, etc.), cai pro fallback determinístico com uma
+  mensagem clara — nunca quebra a criação do plano.
+- **O fallback de regra fixa aprendeu duas coisas que a versão anterior nunca teve.**
+  (1) Cobertura de ombro em 3 porções (`pickShoulderExercises` em `src/lib/routine.ts`):
+  o catálogo não tem nenhum exercício com target "rear_delts" (checado: zero, apesar do
+  `MuscleId` existir na taxonomia) — as 3 porções do deltoide vêm todas de exercícios com
+  target "shoulders", diferenciadas por heurística de nome (`press` = anterior, `lateral`
+  sem `rear`/`reverse` = lateral, `rear`/`reverse` = posterior). Só o split "upper" recebe
+  as 3 (`shoulderSlots = 3`); o "full" fica em 1 pra não desproporcionar um dia de corpo
+  inteiro com 3 exercícios só de ombro — o próprio Alpha Progression (referência) segue o
+  mesmo padrão nos prints analisados. (2) Variedade entre rotinas repetidas do mesmo plano
+  (`bestExerciseFor` agora recebe um `Map<string, number>` de uso compartilhado entre TODAS
+  as rotinas de um mesmo plano, em vez de um `Set` novo a cada chamada como antes — que na
+  prática nunca excluía nada, já que cada alvo muscular só aparece uma vez por rotina).
+  Quando o candidato "novo" acabou pro músculo, prefere repetir o menos usado em vez de
+  travar sempre no mesmo exercício — confirmado por teste manual: um plano de 4 rotinas
+  (Superior/Inferior/Superior/Inferior) saiu com zero IDs de exercício repetidos entre
+  "Superior" e "Superior 2".
 - **Correção de série já registrada precisa de round-trip ao backend** —
   `PATCH /sessions/:id/sets/:setId` (`server/routes/sessions.ts`), reaproveitando a mesma
   lógica de recálculo de recorde pessoal do POST (extraída pra `maybeUpdatePR`). Editar um

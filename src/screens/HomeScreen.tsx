@@ -202,6 +202,12 @@ export default function HomeScreen() {
             ))}
           </div>
 
+          {selectedRoutine?.rationale && (
+            <p className="mt-3 text-xs leading-relaxed text-(--color-text-muted)">
+              {selectedRoutine.rationale}
+            </p>
+          )}
+
           <ul className="mt-6 flex flex-col gap-2">
             {planRoutineItems.map(({ exercise, prescription }) => (
               <li

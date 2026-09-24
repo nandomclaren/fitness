@@ -13,6 +13,8 @@ export interface PlanRoutine {
   planId: string
   label: string
   order: number
+  /** Raciocínio específico dessa rotina — só preenchido no caminho de IA. */
+  rationale: string | null
   exercises: PlanExercise[]
 }
 

@@ -95,6 +95,9 @@ model PlanRoutine {
   planId    String
   label     String
   order     Int
+  /// Raciocínio específico dessa rotina (por que esses exercícios, nessa ordem, pra esse
+  /// dia) — só preenchido no caminho de IA; a regra fixa não gera texto por rotina.
+  rationale String?
   exercises PlanExercise[]
   sessions  WorkoutSession[]
 
