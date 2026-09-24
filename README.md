@@ -573,7 +573,8 @@ concluído) → 4º Streaks (✅ concluído — fecha essa rodada de priorizaç�
   depende mais só do modelo seguir a descrição à risca. Lição prática: sem uma chave de IA
   real acessível durante o desenvolvimento, mudança de schema de tool só é validada de
   verdade em produção — vale considerar pedir uma chave de teste pro sandbox se isso se
-  repetir.
+  repetir. **Confirmado corrigido**: usuário testou em produção depois do deploy e a IA
+  gerou o plano certinho.
 - **Agendamento de início de plano** (pedido em 24/09/2026, junto do bug acima) — usuário
   queria escolher uma data futura pra um plano novo começar, sem interromper o que já está
   ativo até lá. `WorkoutPlan` ganhou `scheduledFor DateTime?` e um novo status `"scheduled"`
